@@ -2,23 +2,20 @@ import sys
 import time
 import socket
 import struct
-
-from PyQt5.QtGui import QFont, QPainter, QColor, QPixmap, QStandardItemModel, QStandardItem
+import matplotlib
+from Logger import Logger
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
-
-import matplotlib
-matplotlib.use('Qt5Agg')
-
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
-
-from matplotlib import rcParams
-
-from crc32 import crc32_fill_table, crc32
-
 from waveform import Waveform
+from matplotlib import rcParams
+from hdf5create import Hdf5Create
+from matplotlib.figure import Figure
+from crc32 import crc32_fill_table, crc32
+from multiprocessing import Process, Queue
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from PyQt5.QtGui import QFont, QPainter, QColor, QPixmap, QStandardItemModel, QStandardItem
 
+matplotlib.use('Qt5Agg')
 rcParams['font.family'] = 'arial'
 
 def printBuff(pref,data):
@@ -39,6 +36,7 @@ class RecvThread(QThread):
         self.sock = sock
         self.data = bytes()
         self.running = True
+        self.tmtowf = TmtoWF()
 
     def run(self):
         while self.running is True:
@@ -74,7 +72,9 @@ class RecvThread(QThread):
                         header = struct.unpack("<BBHBBHI", self.data[off:off + 12])
                         data_off = off + 12
                         if len(self.data) - data_off >= header[5]:
-                            self.rxTmSig.emit(header, self.data[data_off:data_off + header[5]])
+                            #self.rxTmSig.emit(header, self.data[data_off:data_off + header[5]]) #uscita pacchetto completo
+                            self.tmtowf.tmtowf_nogui(header, self.data[data_off:data_off + header[5]])
+
                             off = data_off + header[5]
                         else:
                             self.data = self.data[off:]
@@ -143,6 +143,58 @@ class MsgListItem(QStandardItem):
         self.setBackground(bcolor)
         self.setFont(fnt)
         self.setText(txt)
+
+
+class TmtoWF():
+
+    def __init__(self) -> None:
+
+
+        loggerConfig = Logger()
+        loggerConfig.set_logger()
+        
+        self.logger = Logger().getLogger(__name__)
+
+        self.hdf5create = Hdf5Create()
+        self.wformTotCount = 0
+
+        self.q = Queue()
+        self.p = Process(target=Hdf5Create.f, args=(self.hdf5create, self.q))
+        self.p.start()
+
+    def tmtowf_nogui(self, header, data):
+        if header[3] == 0xA1: # Waveform
+            if header[4] == 0x01: # Waveform header
+                #self.tmToLog(header, data)
+                self.tmToWformInit(header, data)
+            else: # Waveform data
+                self.tmToWformAdd(header, data)
+        else:
+            pass
+            #self.tmToLog(header, data)
+
+    def tmToWformInit(self, header, data):
+        self.wformSeqCount = header[2] & 0x3FFF
+        self.wform = Waveform()
+        self.wform.read_header(data)
+
+    def tmToWformAdd(self, header, data):
+        seqCount = header[2] & 0x3FFF
+        self.wformSeqCount += 1
+        if self.wformSeqCount == seqCount:
+            res = self.wform.read_data(data)
+            if res:
+                self.wform.print()
+                self.wformTotCount += 1
+                print("Complete waveform acquired [%d]" % self.wformTotCount) #waveform totale acquisita
+                self.logger.warning(f"Complete waveform acquired {self.wformTotCount}")
+                #self.hdf5create.wf_append(self.wform)
+                self.q.put(self.wform)
+
+        else:
+            print("Sequence error: cur %6d exp %6d" % (seqCount, self.wformSeqCount))
+
+    
 
 
 class Window(QMainWindow):
@@ -325,7 +377,7 @@ class Window(QMainWindow):
 
             # Open the dialog to get the params
             #host = "127.0.0.1"
-            host = "169.254.179.11"
+            host = "192.168.166.39"
             port = 1234
 
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -423,7 +475,10 @@ class Window(QMainWindow):
             if res:
                 self.wform.print()
                 self.wformTotCount += 1
-                print("Complete waveform acquired [%d]" % self.wformTotCount)
+                print("Complete waveform acquired [%d]" % self.wformTotCount) #waveform totale acquisita
+                self.hdf5create.wf_append(self.wform)
+                #self.q.put(self.wform)
+
                 self.mplCanvas.axes.cla()
                 self.mplCanvas.axes.plot(self.wform.sigt, self.wform.sige)
                 self.mplCanvas.axes.axvline(x=self.wform.trigt, color="black", linestyle=(0, (5, 5)))
