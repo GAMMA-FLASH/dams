@@ -47,14 +47,15 @@ class Hdf5Create():
         """
         first_wf = self.waveforms[0]
         date = first_wf.tstart
-        dateUTC = datetime.datetime.utcfromtimestamp(date).strftime('%Y-%m-%dT%H:%M:%SZ')
+        dateUTC = datetime.datetime.utcfromtimestamp(date).strftime('%Y-%m-%dT%H:%M:%S')
         sessionID = first_wf.sessionID[0]
         runID = first_wf.runID[0]
         configID = first_wf.configID[0]
+        filename = f"/home/antonio/{str(sessionID).zfill(5)}/wf_{str(runID).zfill(5)}_{str(configID).zfill(5)}_{dateUTC}.h5"
         os.makedirs(f"/home/antonio/{str(sessionID).zfill(5)}/", exist_ok=True)
 
 
-        h5file = open_file(f"/home/antonio/{str(sessionID).zfill(5)}/wf_{str(runID).zfill(5)}_{str(configID).zfill(5)}_{dateUTC}.h5", mode="w", title="dl0")
+        h5file = open_file(filename, mode="w", title="dl0")
 
         group = h5file.create_group("/", 'waveforms', 'waveforms information')
 
@@ -75,6 +76,7 @@ class Hdf5Create():
             arraysy[:16384, :2] = np.transpose(np.array([wf.sigt,wf.sige]))[:16384, :2]
         
         h5file.close()
+        okfile = open(f"{filename}.ok", "w")
         #self.wfTotCount = 0
         self.waveforms = []
 
