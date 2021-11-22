@@ -51,7 +51,7 @@ class Hdf5Create():
         sessionID = first_wf.sessionID[0]
         runID = first_wf.runID[0]
         configID = first_wf.configID[0]
-        os.makedirs(f"/home/antonio/{int(sessionID)}/", exist_ok=True)
+        os.makedirs(f"/home/antonio/{str(sessionID).zfill(5)}/", exist_ok=True)
 
 
         h5file = open_file(f"/home/antonio/{str(sessionID).zfill(5)}/wf_{str(runID).zfill(5)}_{str(configID).zfill(5)}_{dateUTC}.h5", mode="w", title="dl0")
@@ -77,6 +77,7 @@ class Hdf5Create():
         h5file.close()
         #self.wfTotCount = 0
         self.waveforms = []
+
         
 
 if __name__ == "__main__":
@@ -131,7 +132,6 @@ if __name__ == "__main__":
     
     table.flush
     """
-
 
 
 
