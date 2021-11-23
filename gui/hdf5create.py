@@ -51,8 +51,13 @@ class Hdf5Create():
         sessionID = first_wf.sessionID[0]
         runID = first_wf.runID[0]
         configID = first_wf.configID[0]
-        filename = f"/dl0/{str(sessionID).zfill(5)}/wf_{str(runID).zfill(5)}_{str(configID).zfill(5)}_{dateUTC}.h5"
-        os.makedirs(f"/dl0/{str(sessionID).zfill(5)}/", exist_ok=True)
+
+        
+        dl0path = os.environ["DL0_INPUT"]
+
+
+        filename = f"/{dl0path}/{str(sessionID).zfill(5)}/wf_{str(runID).zfill(5)}_{str(configID).zfill(5)}_{dateUTC}.h5"
+        os.makedirs(f"/{dl0path}/{str(sessionID).zfill(5)}/", exist_ok=True)
 
 
         h5file = open_file(filename, mode="w", title="dl0")
