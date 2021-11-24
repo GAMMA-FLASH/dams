@@ -78,6 +78,9 @@ class Hdf5Create():
             arraysy._v_attrs.configID = wf.configID[0]
             arraysy._v_attrs.calib = 8
 
+            size_arrays = sys.getsizeof(wf.sigt) + sys.getsizeof(wf.sige)
+            self.logger.warning(f"sizeof array is {size_arrays}")
+
             arraysy[:16384, :2] = np.transpose(np.array([wf.sigt,wf.sige*-1]))[:16384, :2]
         
         h5file.close()
