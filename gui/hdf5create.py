@@ -78,7 +78,7 @@ class Hdf5Create():
             arraysy._v_attrs.configID = wf.configID[0]
             arraysy._v_attrs.calib = 8
 
-            arraysy[:16384, :2] = np.transpose(np.array([wf.sigt,wf.sige]))[:16384, :2]
+            arraysy[:16384, :2] = np.transpose(np.array([wf.sigt,wf.sigr]))[:16384, :2]
         
         h5file.close()
         okfile = open(f"{filename}.ok", "w")
