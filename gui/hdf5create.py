@@ -6,8 +6,11 @@ import pickle
 import logging
 import datetime
 import numpy as np
+import json
+import pymysql.cursors
 from tables import *
 from time import time
+from config_db import get_config
 from Logger import Logger
 from waveform import Waveform
 from multiprocessing import Process
@@ -20,6 +23,14 @@ class Hdf5Create():
     def __init__(self) -> None:
         self.waveforms = []
         self.logger = Logger().getLogger(__name__)
+        conf_dict = get_config()
+
+        self.conn = pymysql.connect(host=conf_dict["db_host"], user=conf_dict["db_user"], \
+            password=conf_dict["db_pass"], db=conf_dict["db_results"], \
+            port=int(conf_dict["db_port"]), cursorclass=pymysql.cursors.DictCursor)
+
+        self.cursor = self.conn.cursor()
+
 
     def wf_append(self, wf):
         self.waveforms.append(wf)
@@ -47,7 +58,7 @@ class Hdf5Create():
         """
         first_wf = self.waveforms[0]
         date = first_wf.tstart
-        dateUTC = datetime.datetime.utcfromtimestamp(date).strftime('%Y-%m-%dT%H:%M:%S')
+        dateUTC = datetime.datetime.utcfromtimestamp(date).strftime('%Y-%m-%dT%H:%M:%S.%f')
         sessionID = first_wf.sessionID[0]
         runID = first_wf.runID[0]
         configID = first_wf.configID[0]
@@ -82,6 +93,16 @@ class Hdf5Create():
             self.logger.warning(f"sizeof array is {size_arrays}")
 
             arraysy[:16384, :2] = np.transpose(np.array([wf.sigt,wf.sige*-1]))[:16384, :2]
+
+            if i == 1: #we select only waveform 1 for quicklook analysis in gui
+                dict_wf = {"x": wf.sigt, "y": (wf.sige*-1)}
+                json_wf = json.dumps(dict_wf)
+
+                query = f"UPDATE gammaflash_test.waveform_dl1 SET waveform='{json_wf}' WHERE RedpitayaID=1;"
+
+                self.cursor.execute(query)
+
+                self.conn.commit()
         
         h5file.close()
         okfile = open(f"{filename}.ok", "w")
