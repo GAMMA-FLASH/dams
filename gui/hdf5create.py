@@ -67,7 +67,7 @@ class Hdf5Create():
         dl0path = os.environ["DL0_INPUT"]
 
 
-        filename = f"/{dl0path}/{str(sessionID).zfill(5)}/wf_{str(runID).zfill(5)}_{str(configID).zfill(5)}_{dateUTC}.h5"
+        filename = f"/{dl0path}/{str(sessionID).zfill(5)}/wf_runId_{str(runID).zfill(5)}_configId_{str(configID).zfill(5)}_{dateUTC}.h5"
         os.makedirs(f"/{dl0path}/{str(sessionID).zfill(5)}/", exist_ok=True)
 
 
