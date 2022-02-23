@@ -20,10 +20,7 @@
 
 #include "globals.h"
 
-#include "tchandler.h"
-#include "packet.h"
-
-// Send periodic HK accroding to the configuration
+// Send periodic HK sccording to the configuration
 void sendPeriodicHk();
 
 int main(int argc, const char * argv[]) {
@@ -78,6 +75,15 @@ int main(int argc, const char * argv[]) {
     }
     
     //--------------------------------------------------------------------------
+    // Start GPS timestamp
+    //--------------------------------------------------------------------------
+    res = g_timeStamp.init();
+    if (res < 0) {
+        printf("Error: Init GPS timestamp handler\n");
+        exit(EXIT_FAILURE);
+    }
+    
+    //--------------------------------------------------------------------------
     // Enter low priority periodic monitoring task
     //--------------------------------------------------------------------------
     
@@ -125,6 +131,21 @@ int main(int argc, const char * argv[]) {
 
             case SIGALRM:
             
+            	/*
+            	struct timespec ts;
+				clock_gettime(CLOCK_REALTIME, &ts);
+				
+				TimeStamp::CurrentTime currTime;
+				uint32_t tsts = g_timeStamp.read(&currTime);
+				if (tsts == 0) {
+					TimeStamp::AbsoluteTime absTime;
+					g_timeStamp.computeAbsoluteTime(&ts, &currTime, &absTime);
+					printf("P %02X %04d %02d %02d %02d %02d %02d %02d %06d\n", tsts, absTime.ppsSliceNo, absTime.year, absTime.month, absTime.day, absTime.hh, absTime.mm, absTime.ss, absTime.us);
+				} else {
+					printf("%02X\n", tsts);
+				}
+				*/
+				
                 // Collect HK data and send to the remote server
                 g_tcHandler.sendHk();
                 

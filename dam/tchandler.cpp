@@ -84,14 +84,18 @@ void TcHandler::recvTc() {
                 
                 header->print();
                 
+                Data_Header* data = (Data_Header*)(buff+sizeof(Header));
+                
+                //printf("Type %02X SubType %02X\n", data->type, data->subType);
+                
                 res = sendBegin();
                 if (res == 0) {
                 
-                    switch (header->type) {
+                    switch (data->type) {
                     
                         // Test
                         case 0x11:
-                            switch (header->subType) {
+                            switch (data->subType) {
                                 case 0x01:
                                     execConnTst(header);
                                     break;
@@ -103,7 +107,7 @@ void TcHandler::recvTc() {
                             
                         // Configuration and control
                         case 0xA0:
-                            switch (header->subType) {
+                            switch (data->subType) {
                                 case 0x04:
                                     execStartAcq(header);
                                     break;
@@ -159,13 +163,14 @@ int TcHandler::sendTcRx(Header *tcHeader, uint8_t err) {
         Header* header = (Header*)buff;
         header->apid     = Header::CLASS_TM + (uint16_t)g_configInfo.damApid;
         header->sequence = Header::GROUP_STAND_ALONE + (uint16_t)g_systemInfo.getPacketCount();
-        header->type     = Data_TcRx::TYPE;
-        header->subType  = Data_TcRx::SUB_TYPE;
+        header->runID	 = (uint16_t)g_configInfo.damRunID;
         header->size     = sizeof(Data_TcRx);
     
         Data_TcRx* data = (Data_TcRx*)(buff+sizeof(Header));
-        data->err = err;
-        data->apid = tcHeader->apid;
+        data->type     = Data_TcRx::TYPE;
+        data->subType  = Data_TcRx::SUB_TYPE;
+        data->err      = err;
+        data->apid     = tcHeader->apid;
         data->sequence = tcHeader->sequence;
     
         //data->encode();
@@ -192,13 +197,14 @@ int TcHandler::sendTcExec(Header *tcHeader, uint8_t err) {
         Header* header = (Header*)buff;
         header->apid     = Header::CLASS_TM + (uint16_t)g_configInfo.damApid;
         header->sequence = Header::GROUP_STAND_ALONE + (uint16_t)g_systemInfo.getPacketCount();
-        header->type     = Data_TcExec::TYPE;
-        header->subType  = Data_TcExec::SUB_TYPE;
+        header->runID	 = (uint16_t)g_configInfo.damRunID;
         header->size     = sizeof(Data_TcExec);
     
-        Data_TcRx* data = (Data_TcRx*)(buff+sizeof(Header));
-        data->err = err;
-        data->apid = tcHeader->apid;
+        Data_TcExec* data = (Data_TcExec*)(buff+sizeof(Header));
+        data->type     = Data_TcExec::TYPE;
+        data->subType  = Data_TcExec::SUB_TYPE;
+        data->err      = err;
+        data->apid     = tcHeader->apid;
         data->sequence = tcHeader->sequence;
     
         //data->encode();

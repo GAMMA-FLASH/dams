@@ -90,32 +90,28 @@ static inline void memcpy_32_min(volatile void *dst, volatile const void *src, s
 	}
 }
 
-// Header data
+// Wform data
 typedef union {
-    uint8_t _p8[20];
-    uint16_t _p16[10];
-    uint32_t _p32[5];
+    uint8_t _p8[24];
+    uint16_t _p16[12];
+    uint32_t _p32[6];
     struct __attribute__((packed)) {
         struct timespec ts; // 2 x 32
-        uint8_t dummy0;
+        uint8_t tsts;
         uint8_t eql;
         uint16_t dec;
-        uint32_t curr_off;
-        uint32_t trig_off;
+        uint32_t currOff;
+        uint32_t trigOff;
         uint32_t size;
     };
-} header_t;
+} AcquisitionInfo;
 
-// Packet
+// Full buffer
 typedef struct {
-	header_t header;
-	uint32_t data[OSC_FPGA_SIG_LEN];
-} packet_t;
-
-typedef struct {
-	header_t header;
+	TimeStamp::CurrentTime currTime;
+	AcquisitionInfo acqInfo;
 	uint32_t data[OSC_FPGA_SIG_LEN/2];
-} packet_min_t;
+} WaveformBuffer; // WaveformBuffer
 
 void *acqThreadFcn(void *ptr) {
     
@@ -182,22 +178,30 @@ void *acqThreadFcn(void *ptr) {
 		// trigger is armed again
 		res = osc_fpga_wait_trigger(5);
 		if (res == 0) {
+		
+			// Capture trigger time
+			struct timespec trig_ts;
+			clock_gettime(CLOCK_REALTIME, &trig_ts);
 			
 			// Get buffer
-			packet_min_t *packet = NULL;
-			m_fifo.pushGet((uint32_t**)&packet);
+			WaveformBuffer *wformBuff = NULL;
+			m_fifo.pushGet((uint32_t**)&wformBuff);
+			
+			// Get time stamp data
+			uint32_t tsts = g_timeStamp.read(&wformBuff->currTime);
 			
 			// Fill packet header
-			clock_gettime(CLOCK_REALTIME, &packet->header.ts);
-			packet->header.dummy0 	= 0x00;
-			packet->header.eql 		= g_configInfo.oscEqLevel;
-			packet->header.dec 		= g_configInfo.oscDecimation;
-			packet->header.curr_off = g_osc_fpga_reg_mem->wr_ptr_curr;
-			packet->header.trig_off = g_osc_fpga_reg_mem->wr_ptr_trig;
-			packet->header.size 	= OSC_FPGA_SIG_LEN;
+			wformBuff->acqInfo.ts.tv_sec  	= trig_ts.tv_sec;
+			wformBuff->acqInfo.ts.tv_nsec 	= trig_ts.tv_nsec;
+			wformBuff->acqInfo.tsts 		= (uint8_t)tsts;
+			wformBuff->acqInfo.eql 			= g_configInfo.oscEqLevel;
+			wformBuff->acqInfo.dec 			= g_configInfo.oscDecimation;
+			wformBuff->acqInfo.currOff 		= g_osc_fpga_reg_mem->wr_ptr_curr;
+			wformBuff->acqInfo.trigOff 		= g_osc_fpga_reg_mem->wr_ptr_trig;
+			wformBuff->acqInfo.size 		= OSC_FPGA_SIG_LEN;
 			
 			// Copy data
-			memcpy_32_min(packet->data, g_osc_fpga_cha_mem, OSC_FPGA_SIG_LEN);
+			memcpy_32_min(wformBuff->data, g_osc_fpga_cha_mem, OSC_FPGA_SIG_LEN);
 			
 			// Release buffer
 			m_fifo.pushRelease();
@@ -219,7 +223,7 @@ void *acqThreadFcn(void *ptr) {
 				}
 			}
 			
-			// Wait between two acquisitions
+			// Wait time between two acquisitions
 			if (g_systemInfo.waitUsecs) {
 				usleep(g_systemInfo.waitUsecs);
 			}

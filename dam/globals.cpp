@@ -14,5 +14,6 @@ SystemInfo g_systemInfo;
 DataStore g_dataStore;
 TcpServer g_ctrlServer;
 TcHandler g_tcHandler;
+TimeStamp g_timeStamp;
 WaveAcq g_waveAcq;
 pthread_t g_mainThreadInfo;

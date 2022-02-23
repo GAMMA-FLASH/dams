@@ -14,8 +14,8 @@
 // Software version
 //--------------------------------------------------------------------------
 #define ASW_VER 2
-#define ASW_SUB 1
-#define ASW_DEP 80
+#define ASW_SUB 3
+#define ASW_DEP 74
 
 //--------------------------------------------------------------------------
 // Appplication identification
@@ -55,8 +55,8 @@
 //--------------------------------------------------------------------------
 #define OSC_FPGA_SIG_LEN   (16*1024)	// 16384 samples
 #define FIFO_BUFF_NO 		6
-#define FIFO_BUFF_SZ 		8198        // Buffer size in terms of unit32 (8192 pairs of samples + 6 int x header)
-#define U32_X_PACKET 		1021		// Number of uint32 for each packet
+#define FIFO_BUFF_SZ 		8204        // Buffer size in terms of unit32 (8192 pairs of samples + 12 int x header)
+#define U32_X_PACKET 		1020		// Number of uint32 for each packet
 
 //--------------------------------------------------------------------------
 // OSC classic

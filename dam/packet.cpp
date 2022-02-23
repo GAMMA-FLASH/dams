@@ -98,8 +98,6 @@ void Header::encode() {
     crc = 0xFFFFFFFF;
     crc32(_p32 + 2, _p8 + 12, size, crc32Table);
     
-    // Swap if needed
-    
 }
 
 int Header::decode() {
@@ -112,9 +110,6 @@ int Header::decode() {
                 crc32(&computedCrc, _p8 + 12, size, crc32Table);
             }
             if (computedCrc == crc) {
-                        
-                // Swap if needed
-                        
                 return 0;
             }
         }
@@ -153,9 +148,8 @@ void Header::print() {
     }
     
     printf(" Count: %04X\n", sequence & COUNT_MASK);
+    printf("Run ID: %04X\n", runID);
     printf("  Size: %04X\n", size);
-    printf("  Type: %02X\n", type);
-    printf(" Stype: %02X\n", subType);
     printf("   CRC: %08X\n", crc);
     
 }

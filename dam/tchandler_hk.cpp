@@ -32,11 +32,12 @@ int TcHandler::sendHk() {
             Header* header = (Header*)buff;
             header->apid     = Header::CLASS_TM + (uint16_t)g_configInfo.damApid;
             header->sequence = Header::GROUP_STAND_ALONE + (uint16_t)g_systemInfo.getPacketCount();
-            header->type     = Data_Hk::TYPE;
-            header->subType  = Data_Hk::SUB_TYPE;
+            header->runID	 = (uint16_t)g_configInfo.damRunID;
             header->size     = sizeof(Data_Hk);
     
             Data_Hk* data = (Data_Hk*)(buff+sizeof(Header));
+            data->type     = Data_Hk::TYPE;
+        	data->subType  = Data_Hk::SUB_TYPE;
             data->state = g_systemInfo.state;
             data->flags = g_systemInfo.flags;
             data->waveCount = g_systemInfo.waveCount;

@@ -30,13 +30,12 @@ int TcHandler::execConnTst(Header *tcHeader) {
         Header* header = (Header*)buff;
         header->apid     = Header::CLASS_TM + (uint16_t)g_configInfo.damApid;
         header->sequence = Header::GROUP_STAND_ALONE + (uint16_t)g_systemInfo.getPacketCount();
-        header->type     = Data_ConnTst::TYPE;
-        header->subType  = Data_ConnTst::SUB_TYPE;
+        header->runID	 = (uint16_t)g_configInfo.damRunID;
         header->size     = sizeof(Data_ConnTst);
 
         Data_ConnTst* data = (Data_ConnTst*)(buff+sizeof(Header));
-        data->_p8[0] = 0x80;
-        data->_p8[1] = 0x09;
+        data->type     = Data_ConnTst::TYPE;
+        data->subType  = Data_ConnTst::SUB_TYPE;
         data->_p8[2] = 0xA0;
         data->_p8[3] = 0x0B;
         data->_p8[4] = 0xC0;

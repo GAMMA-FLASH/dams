@@ -37,16 +37,33 @@ def int_to_twos_comp(val, bits):
 class Waveform:
     """GAMMA_FLASH Waveform handling"""
 
-    def __init__(self):
-        self.runID = []
+    def __init__(self,runID=[]):
+
+        # Operation identification
+        self.runID = runID
         self.sessionID = []
         self.configID = []
+
+        # Absolute time
+        self.timeSts = []
+        self.ppsSliceNo = []
+        self.year = []
+        self.month = []
+        self.day = []
+        self.hh = []
+        self.mm = []
+        self.ss = []
+        self.usec = []
+
+        # Waveform info
         self.tstmp = []
         self.eql = []
         self.dec = []
         self.curr_off = []
         self.trig_off = []
         self.sample_no = []
+
+        # Derived data
         self.tstart = []
         self.tstop = []
         self.dt = []
@@ -107,18 +124,52 @@ class Waveform:
     def read_header(self, raw):
 
         # Unpack header data
-        off = 0
 
-        sz = 4
-        self.runID = struct.unpack("<L", raw[off:off + sz])  # timespec sec.nsec
+        # Skip type/subtype/spare0/spare1
+        off = 4
+
+        sz = 2
+        self.sessionID = struct.unpack("<H", raw[off:off + sz])[0]
+        off += sz
+
+        sz = 2
+        self.configID = struct.unpack("<H", raw[off:off + sz])[0]
+        off += sz
+
+        sz = 1
+        self.timeSts = struct.unpack("<B", raw[off:off + sz])[0]
+        off += sz
+
+        sz = 1
+        self.ppsSliceNo = struct.unpack("<B", raw[off:off + sz])[0]
+        off += sz
+
+        sz = 1
+        self.year = struct.unpack("<B", raw[off:off + sz])[0]
+        off += sz
+
+        sz = 1
+        self.month = struct.unpack("<B", raw[off:off + sz])[0]
+        off += sz
+
+        sz = 1
+        self.day = struct.unpack("<B", raw[off:off + sz])[0]
+        off += sz
+
+        sz = 1
+        self.hh = struct.unpack("<B", raw[off:off + sz])[0]
+        off += sz
+
+        sz = 1
+        self.mm = struct.unpack("<B", raw[off:off + sz])[0]
+        off += sz
+
+        sz = 1
+        self.ss = struct.unpack("<B", raw[off:off + sz])[0]
         off += sz
 
         sz = 4
-        self.sessionID = struct.unpack("<L", raw[off:off + sz])  # timespec sec.nsec
-        off += sz
-
-        sz = 4
-        self.configID = struct.unpack("<L", raw[off:off + sz])  # timespec sec.nsec
+        self.usec = struct.unpack("<L", raw[off:off + sz])[0]
         off += sz
 
         sz = 8
@@ -126,11 +177,11 @@ class Waveform:
         off += sz
 
         sz = 1
-        dummy = struct.unpack("<B", raw[off:off+sz])[0]  # dummy
+        #dummy = struct.unpack("<B", raw[off:off+sz])[0]  # dummy
         off += sz
 
         sz = 1
-        self.eql = struct.unpack("<B", raw[off:off+sz])[0]  # euqualization
+        self.eql = struct.unpack("<B", raw[off:off+sz])[0]  # equalization
         off += sz
 
         sz = 2
@@ -154,11 +205,13 @@ class Waveform:
 
     def read_data(self, raw):
 
+        print("Sample to read %8d" % self.sample_to_read)
+
         # Number of samples in this block of data
-        n = len(raw)/2
+        n = (len(raw)-4)/2
 
         # Unpack waveform data
-        self.data += struct.unpack("<%dH" % n, raw)
+        self.data += struct.unpack("<%dH" % n, raw[4:])
 
         self.sample_to_read -= n
         if self.sample_to_read == 0:
@@ -206,6 +259,17 @@ class Waveform:
         print("      Run ID: %08d" % self.runID)
         print("  Session ID: %08d" % self.sessionID)
         print("  Config. ID: %08d" % self.configID)
+        print(" Time status: %02X" % self.timeSts)
+
+        if self.timeSts == 0:
+            print("        Year: %02d" % self.year)
+            print("       Month: %02d" % self.month)
+            print("         Day: %02d" % self.day)
+            print("       Hours: %02d" % self.hh)
+            print("     Minutes: %02d" % self.mm)
+            print("     Seconds: %02d" % self.ss)
+            print("Microseconds: %06d" % self.usec)
+
         print("  Start time: %22.9f [s]" % self.tstart)
         print("   Stop time: %22.9f [s]" % self.tstop)
         print("Equalization:    %6d," % self.eql)

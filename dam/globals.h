@@ -14,6 +14,7 @@
 #include "tcp.h"
 #include "tchandler.h"
 #include "waveacq.h"
+#include "tstamp.h"
 
 //--------------------------------------------------------------------------
 // Configuration info
@@ -39,6 +40,11 @@ extern TcpServer g_ctrlServer;
 // TC handler
 //--------------------------------------------------------------------------
 extern TcHandler g_tcHandler;
+
+//--------------------------------------------------------------------------
+// GPS timestamp handling
+//--------------------------------------------------------------------------
+extern TimeStamp g_timeStamp;
 
 //--------------------------------------------------------------------------
 // Waveform acquisition

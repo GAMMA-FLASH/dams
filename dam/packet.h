@@ -59,8 +59,7 @@ public:
             uint8_t start;
             uint8_t apid;
             uint16_t sequence;
-            uint8_t type;
-            uint8_t subType;
+            uint16_t runID;
             uint16_t size;
             uint32_t crc;
         };
@@ -73,6 +72,23 @@ public:
     
 };
 
+class Data_Header {
+    
+public:
+    
+    // Header data
+    union {
+        uint8_t _p8[4];
+        uint16_t _p16[2];
+        uint32_t _p32[1];
+        struct __attribute__((packed)) {
+            uint8_t type;
+            uint8_t subType;
+        };
+    };
+    
+};
+
 class Data_TcRx {
     
 public:
@@ -82,10 +98,12 @@ public:
     
     // Header data
     union {
-        uint8_t _p8[4];
-        uint16_t _p16[2];
-        uint32_t _p32[1];
+        uint8_t _p8[8];
+        uint16_t _p16[4];
+        uint32_t _p32[2];
         struct __attribute__((packed)) {
+        	uint8_t type;
+            uint8_t subType;
             uint8_t err;
             uint8_t apid;
             uint16_t sequence;
@@ -103,10 +121,12 @@ public:
     
     // Header data
     union {
-        uint8_t _p8[4];
-        uint16_t _p16[2];
-        uint32_t _p32[1];
+        uint8_t _p8[48];
+        uint16_t _p16[4];
+        uint32_t _p32[2];
         struct __attribute__((packed)) {
+        	uint8_t type;
+            uint8_t subType;
             uint8_t err;
             uint8_t apid;
             uint16_t sequence;
@@ -128,10 +148,10 @@ public:
         uint16_t _p16[4];
         uint32_t _p32[2];
         struct __attribute__((packed)) {
+        	uint8_t type;
+            uint8_t subType;
             uint8_t state;
             uint8_t flags;
-            uint8_t spare0;
-            uint8_t spare1;
             uint32_t waveCount;
         };
     };
@@ -150,6 +170,10 @@ public:
         uint8_t _p8[8];
         uint16_t _p16[4];
         uint32_t _p32[2];
+        struct __attribute__((packed)) {
+        	uint8_t type;
+            uint8_t subType;
+        };
     };
     
 };
@@ -167,10 +191,10 @@ public:
         uint16_t _p16[6];
         uint32_t _p32[3];
         struct __attribute__((packed)) {
+        	uint8_t type;
+            uint8_t subType;
             uint8_t source;
             uint8_t spare0;
-            uint8_t spare1;
-            uint8_t spare2;
             uint32_t maxWaveNo;
             uint32_t waitUsecs;
         };
@@ -187,18 +211,41 @@ public:
     
     // Header data
     union {
-        uint8_t _p8[36];
-        uint16_t _p16[18];
-        uint32_t _p32[9];
+        uint8_t _p8[44];
+        uint16_t _p16[22];
+        uint32_t _p32[11];
         struct __attribute__((packed)) {
-        	uint32_t runID;
-        	uint32_t sessionID;
-        	uint32_t configID;
-            struct timespec ts;
-            uint32_t dec;
-            uint32_t currOff;
-            uint32_t trigOff;
-            uint32_t size;
+        	
+        	// Type/subtype
+        	uint8_t type;		// 0
+            uint8_t subType;
+            uint8_t spare0;
+            uint8_t spare1;
+            
+            // Session and configuration
+        	uint16_t sessionID;	// 1
+        	uint16_t configID;
+        	
+        	// Time tagging
+        	uint8_t timeSts;	// 2
+        	uint8_t ppsSliceNo;
+        	uint8_t year;
+        	uint8_t month;
+        	
+        	uint8_t day;		// 3
+        	uint8_t hh;
+        	uint8_t mm;
+        	uint8_t ss;
+
+        	uint32_t us;		// 4
+        	
+        	// Waveform acquisition params
+            struct timespec ts;	// 5
+            uint32_t dec;		// 7
+            uint32_t currOff;	// 8
+            uint32_t trigOff;	// 9
+            uint32_t size;		// 10
+                        
         };
     };
     
@@ -213,9 +260,16 @@ public:
     
     // Header data
     union {
-        uint8_t _p8[4*U32_X_PACKET];
-        uint16_t _p16[2*U32_X_PACKET];
-        uint32_t _p32[U32_X_PACKET];
+        uint8_t _p8[4*(1+U32_X_PACKET)];
+        uint16_t _p16[2*(1+U32_X_PACKET)];
+        uint32_t _p32[1+U32_X_PACKET];
+        struct __attribute__((packed)) {
+        	uint8_t type;
+            uint8_t subType;
+            uint8_t spare0;
+            uint8_t spare1;
+            uint32_t buff[U32_X_PACKET];
+        };
     };
     
 };

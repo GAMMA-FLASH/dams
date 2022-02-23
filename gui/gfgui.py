@@ -67,15 +67,14 @@ class RecvThread(QThread):
                         # [0] Start (uint8)
                         # [1] APID (uint8)
                         # [2] Sequence (uint16)
-                        # [3] Type (uint8)
-                        # [4] SubType (uint8)
-                        # [5] Size (uint16)
-                        # [6] CRC (uint32)
-                        header = struct.unpack("<BBHBBHI", self.data[off:off + 12])
+                        # [3] Run ID (uint16)
+                        # [4] Size (uint16)
+                        # [5] CRC (uint32)
+                        header = struct.unpack("<BBHHHI", self.data[off:off + 12])
                         data_off = off + 12
-                        if len(self.data) - data_off >= header[5]:
-                            self.rxTmSig.emit(header, self.data[data_off:data_off + header[5]])
-                            off = data_off + header[5]
+                        if len(self.data) - data_off >= header[4]:
+                            self.rxTmSig.emit(header, self.data[data_off:data_off + header[4]])
+                            off = data_off + header[4]
                         else:
                             self.data = self.data[off:]
                             break
@@ -200,6 +199,14 @@ class Window(QMainWindow):
         self.stopAcqAct = QAction("S&top acq.", self)
         self.stopAcqAct.triggered.connect(self.stopAcq)
 
+        self.logWformHeaderAct = QAction("Log waveform header", self)
+        self.logWformHeaderAct.setCheckable(True)
+        self.logWformHeaderAct.triggered.connect(self.logWformHeaderUpdate)
+
+        self.logWformDataAct = QAction("Log waveform data", self)
+        self.logWformDataAct.setCheckable(True)
+        self.logWformDataAct.triggered.connect(self.logWformDataUpdate)
+
         mb = self.menuBar()
         devMenu = mb.addMenu("&Server")
         devMenu.addAction(self.serverConnAct)
@@ -208,6 +215,9 @@ class Window(QMainWindow):
         devMenu.addAction(self.connTestAct)
         devMenu.addAction(self.startAcqAct)
         devMenu.addAction(self.stopAcqAct)
+        devMenu = mb.addMenu("&Configuration")
+        devMenu.addAction(self.logWformHeaderAct)
+        devMenu.addAction(self.logWformDataAct)
 
         # Not use the native menu bar when in macOS
         mb.setNativeMenuBar(False)
@@ -227,14 +237,19 @@ class Window(QMainWindow):
         self.wformTotCount = 0
         self.wformSeqCount = -1
         self.wform = None
+        self.logWformHeader = False
+        self.logWformData = False
 
     @pyqtSlot(tuple,bytes)
     def rxTm(self, header, data):
-        if header[3] == 0xA1: # Waveform
-            if header[4] == 0x01: # Waveform header
-                #self.tmToLog(header, data)
+        if data[0] == 0xA1: # Waveform
+            if data[1] == 0x01: # Waveform header
+                if self.logWformHeader:
+                    self.tmToLog(header, data)
                 self.tmToWformInit(header, data)
             else: # Waveform data
+                if self.logWformData:
+                    self.tmToLog(header, data)
                 self.tmToWformAdd(header, data)
         else:
             self.tmToLog(header, data)
@@ -264,12 +279,12 @@ class Window(QMainWindow):
         fcolor = QColor(0, 0, 0)
         bcolor = QColor(255, 255, 255)
 
-        if header[3] == 0x01:
-            if data[0] == 0x00:
+        if data[0] == 0x01:
+            if data[2] == 0x00:
                 bcolor = QColor(209, 255, 189) # Light green
             else:
                 bcolor = QColor(245, 191, 206) # Light red
-        elif header[3] == 0x03:
+        elif data[0] == 0x03:
             fcolor = QColor(200, 200, 200)
 
         c1 = MsgListItem(txt="%8.3f" % uptime, fcolor=fcolor, bcolor=bcolor)
@@ -288,14 +303,14 @@ class Window(QMainWindow):
         else:
             c3 = MsgListItem(txt="U", fcolor=fcolor, bcolor=bcolor)
         c4 = MsgListItem(txt="%3d" % seq_count, fcolor=fcolor, bcolor=bcolor)
-        c5 = MsgListItem(txt="%3d" % header[3], fcolor=fcolor, bcolor=bcolor)
-        c6 = MsgListItem(txt="%3d" % header[4], fcolor=fcolor, bcolor=bcolor)
+        c5 = MsgListItem(txt="%3d" % data[0], fcolor=fcolor, bcolor=bcolor)
+        c6 = MsgListItem(txt="%3d" % data[1], fcolor=fcolor, bcolor=bcolor)
 
         interpretation = ""
 
-        if header[3] == 0x03:
-            if header[4] == 0x01:
-                payload = struct.unpack("<BBBBI", data)
+        if data[0] == 0x03: # HK
+            if data[1] == 0x01:
+                payload = struct.unpack("<BBI", data[2:])
                 interpretation = "Hk "
                 if payload[0] == 0x02:
                     interpretation += "SRV"
@@ -315,7 +330,7 @@ class Window(QMainWindow):
                     interpretation += "T"
                 else:
                     interpretation += "_"
-                interpretation += " %8d" % payload[4]
+                interpretation += " %8d" % payload[2]
 
         c7 = MsgListItem(txt=interpretation, fcolor=fcolor, bcolor=bcolor)
         return [c1, c2, c3, c4, c5, c6, c7]
@@ -370,9 +385,20 @@ class Window(QMainWindow):
 
     def connTest(self):
         if self.recvThread is not None:
+
+            # Data
+            data = struct.pack("<BBBB", 0x11, 0x01, 0x00, 0x00)
+
+            # Compute CRC
+            crc = 0xFFFFFFFF
+            crc = crc32(crc, data, self.crcTable)
+
+            # Header
             self.tcCount += 1
-            tc = struct.pack("<BBHBBHI", 0x8D, 0x00 + 0x0A, 0xC000 + self.tcCount, 0x11, 0x01, 0x0000, 0xFFFFFFFF)
-            self.sock.send(tc)
+            header = struct.pack("<BBHHHI", 0x8D, 0x00 + 0x0A, 0xC000 + self.tcCount, 0x0000, len(data), crc)
+
+            # Send
+            self.sock.send(header + data)
 
     def startAcq(self):
         if self.recvThread is not None:
@@ -385,7 +411,7 @@ class Window(QMainWindow):
                 print(dlg.waitUsecs.text())
 
                 # Create data section
-                data = struct.pack("<BBBBII", dlg.source.currentIndex(), 0, 0, 0, int(dlg.waveNo.text()), int(dlg.waitUsecs.text()))
+                data = struct.pack("<BBBBII", 0xA0, 0x04, dlg.source.currentIndex(), 0, int(dlg.waveNo.text()), int(dlg.waitUsecs.text()))
 
                 # Compute CRC
                 crc = 0xFFFFFFFF
@@ -393,7 +419,7 @@ class Window(QMainWindow):
 
                 # Create header
                 self.tcCount += 1
-                header = struct.pack("<BBHBBHI", 0x8D, 0x00 + 0x0A, 0xC000 + self.tcCount, 0xA0, 0x04, len(data), crc)
+                header = struct.pack("<BBHHHI", 0x8D, 0x00 + 0x0A, 0xC000 + self.tcCount, 0x0000, len(data), crc)
 
                 # Send
                 self.sock.send(header + data)
@@ -406,13 +432,31 @@ class Window(QMainWindow):
 
     def stopAcq(self):
         if self.recvThread is not None:
-            self.tcCount += 1
-            tc = struct.pack("<BBHBBHI", 0x8D, 0x00 + 0x0A, 0xC000 + self.tcCount, 0xA0, 0x05, 0x0000, 0xFFFFFFFF)
-            self.sock.send(tc)
+            if self.recvThread is not None:
+
+                # Data
+                data = struct.pack("<BBBB", 0xA0, 0x05, 0x00, 0x00)
+
+                # Compute CRC
+                crc = 0xFFFFFFFF
+                crc = crc32(crc, data, self.crcTable)
+
+                # Header
+                self.tcCount += 1
+                header = struct.pack("<BBHHHI", 0x8D, 0x00 + 0x0A, 0xC000 + self.tcCount, 0x0000, len(data), crc)
+
+                # Send
+                self.sock.send(header + data)
+
+    def logWformHeaderUpdate(self, checked):
+        self.logWformHeader = checked
+
+    def logWformDataUpdate(self, checked):
+        self.logWformData = checked
 
     def tmToWformInit(self, header, data):
         self.wformSeqCount = header[2] & 0x3FFF
-        self.wform = Waveform()
+        self.wform = Waveform(runID=header[3])
         self.wform.read_header(data)
 
     def tmToWformAdd(self, header, data):

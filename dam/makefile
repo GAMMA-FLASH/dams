@@ -3,7 +3,7 @@ CFLAGS += -I/opt/redpitaya/include
 LDFLAGS = -L/opt/redpitaya/lib
 LDLIBS = -lm -lpthread -lrp -lstdc++
 
-all: main fifo globals datastore systeminfo configinfo tcp waveacq pugixml packet tchandler osc_fpga
+all: main fifo globals datastore systeminfo configinfo tcp waveacq pugixml packet tchandler osc_fpga hk_fpga uart tstamp
 	gcc -o dam *.o $(LDFLAGS) $(LDLIBS)
 
 main: main.cpp
@@ -45,5 +45,15 @@ tchandler: tchandler.cpp tchandler_acq.cpp tchandler_hk.cpp tchandler_test.cpp t
 
 osc_fpga: osc_fpga.cpp osc_fpga.h
 	gcc $(CFLAGS) -c osc_fpga.cpp 
+
+hk_fpga: hk_fpga.cpp hk_fpga.h
+	gcc $(CFLAGS) -c hk_fpga.cpp 
+
+uart: uart.cpp uart.h
+	gcc $(CFLAGS) -c uart.cpp
+
+tstamp: tstamp.cpp tstamp.h
+	gcc $(CFLAGS) -c tstamp.cpp
+
 clean:
 	rm *.o dam
