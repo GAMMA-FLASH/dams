@@ -5,6 +5,7 @@ import tables
 import pickle
 import logging
 import datetime
+import traceback
 import numpy as np
 import json
 import pymysql.cursors
@@ -56,42 +57,43 @@ class Hdf5Create():
         /../sessionID/progress/hk_runID_subrun_configID_date-h5
 
         """
-        first_wf = self.waveforms[0]
-        date = first_wf.tstart
-        dateUTC = datetime.datetime.utcfromtimestamp(date).strftime('%Y-%m-%dT%H:%M:%S.%f')
-        sessionID = first_wf.sessionID[0]
-        runID = first_wf.runID[0]
-        configID = first_wf.configID[0]
+        try:
+            first_wf = self.waveforms[0]
+            date = first_wf.tstart
+            dateUTC = datetime.datetime.utcfromtimestamp(date).strftime('%Y-%m-%dT%H:%M:%S.%f')
+            sessionID = first_wf.sessionID
+            runID = first_wf.runID
+            configID = first_wf.configID
 
-        
-        dl0path = os.environ["DL0_INPUT"]
-
-
-        filename = f"/{dl0path}/{str(sessionID).zfill(5)}/wf_runId_{str(runID).zfill(5)}_configId_{str(configID).zfill(5)}_{dateUTC}.h5"
-        os.makedirs(f"/{dl0path}/{str(sessionID).zfill(5)}/", exist_ok=True)
+            
+            dl0path = os.environ["DL0_INPUT"]
 
 
-        h5file = open_file(filename, mode="w", title="dl0")
+            filename = f"/{dl0path}/{str(sessionID).zfill(5)}/wf_runId_{str(runID).zfill(5)}_configId_{str(configID).zfill(5)}_{dateUTC}.h5"
+            os.makedirs(f"/{dl0path}/{str(sessionID).zfill(5)}/", exist_ok=True)
 
-        group = h5file.create_group("/", 'waveforms', 'waveforms information')
 
-        atom = tables.Float32Atom()
-        shape = (16384, 2)
-        filters = tables.Filters(complevel=5, complib='zlib')
+            h5file = open_file(filename, mode="w", title="dl0")
 
-        for i, wf in enumerate(self.waveforms):
-            arraysy = h5file.create_carray(group, f"wf_{str(i).zfill(6)}", atom, shape, f"wf_{i}", filters=filters)
-            arraysy._v_attrs.rp_id = 1
-            arraysy._v_attrs.tstart = wf.tstart
-            arraysy._v_attrs.tend = wf.tstop
-            arraysy._v_attrs.runid = wf.runID[0]
-            arraysy._v_attrs.sessionID = wf.sessionID[0]
-            arraysy._v_attrs.configID = wf.configID[0]
-            arraysy._v_attrs.calib = 8
+            group = h5file.create_group("/", 'waveforms', 'waveforms information')
 
-            arraysy[:16384, :2] = np.transpose(np.array([wf.sigt,wf.sige*-1]))[:16384, :2]
+            atom = tables.Float32Atom()
+            shape = (16384, 2)
+            filters = tables.Filters(complevel=5, complib='zlib')
 
-            try: 
+            for i, wf in enumerate(self.waveforms):
+                arraysy = h5file.create_carray(group, f"wf_{str(i).zfill(6)}", atom, shape, f"wf_{i}", filters=filters)
+                arraysy._v_attrs.rp_id = 1
+                arraysy._v_attrs.tstart = wf.tstart
+                arraysy._v_attrs.tend = wf.tstop
+                arraysy._v_attrs.runid = wf.runID
+                arraysy._v_attrs.sessionID = wf.sessionID
+                arraysy._v_attrs.configID = wf.configID
+                arraysy._v_attrs.calib = 8
+
+                arraysy[:16384, :2] = np.transpose(np.array([wf.sigt,wf.sige*-1]))[:16384, :2]
+
+            
                 if i == 1: #we select only waveform 1 for quicklook analysis in gui
                     dict_wf = {"x": wf.sigt.tolist(), "y": (wf.sige*-1).tolist()}
                     json_wf = json.dumps(dict_wf)
@@ -101,12 +103,18 @@ class Hdf5Create():
                     self.cursor.execute(query)
 
                     self.conn.commit()
-            except Exception as e:
-                self.logger.critical(f"{e}")
+            
+            h5file.close()
+
+            okfile = open(f"{filename}.ok", "w")
+            self.waveforms = []
+        except Exception as e:
+            self.logger.critical(f"{e}")
+            self.logger.critical(f"{traceback.print_exc()}")
+            
         
-        h5file.close()
-        okfile = open(f"{filename}.ok", "w")
-        self.waveforms = []
+        
+        
 
 
 
