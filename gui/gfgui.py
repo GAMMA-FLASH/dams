@@ -187,7 +187,6 @@ class TmtoWF():
                 self.wformTotCount += 1
                 print("Complete waveform acquired [%d]" % self.wformTotCount) #waveform totale acquisita
                 self.logger.warning(f"Complete waveform acquired {self.wformTotCount}")
-                self.hdf5create.wf_append(self.wform)
                 self.q.put(self.wform)
 
         else:

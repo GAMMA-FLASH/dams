@@ -38,7 +38,6 @@ class Hdf5Create():
 
         if len(self.waveforms) == N_WFORMS:
             self.hdf5wf_create()
-        print(wf)
 
     def f(self, q):
         while True:
