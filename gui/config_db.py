@@ -3,7 +3,7 @@ import os
 
 def get_config():
 
-    db_host = '192.168.166.79'
+    db_host = '192.168.0.6'
     db_user = 'gammaflash'
     db_pass = os.environ["DB_PASS"]
     db_port = '3306'

@@ -131,6 +131,36 @@ class StartAcqDialog(QDialog):
         layout.addWidget(buttonBox)
         self.setLayout(layout)
 
+class SetAddressDialog(QDialog):
+    def __init__(self,host,port):
+        super().__init__()
+
+        self.setWindowTitle("Set server address")
+        self.resize(270, 110)
+
+        self.hostLineEdit = QLineEdit(host)
+        self.portLineEdit = QLineEdit(str(port))
+
+        formLayout = QFormLayout()
+        formLayout.addRow("Host", self.hostLineEdit)
+        formLayout.addRow("Port", self.portLineEdit)
+
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+
+        buttonBox = QDialogButtonBox(QBtn)
+        buttonBox.accepted.connect(self.accept)
+        buttonBox.rejected.connect(self.reject)
+
+        layout = QVBoxLayout()
+        layout.addLayout(formLayout)
+        layout.addWidget(buttonBox)
+        self.setLayout(layout)
+
+    def getAddress(self):
+        host = self.hostLineEdit.text()
+        port = int(self.portLineEdit.text())
+        return host, port
+
 
 class MsgListItem(QStandardItem):
     def __init__(self, txt='', font_size=10, set_bold=False, fcolor=QColor(0, 0, 0), bcolor=QColor(255, 255, 255)):
@@ -291,6 +321,9 @@ class Window(QMainWindow):
         self.logWformHeader = False
         self.logWformData = False
 
+        self.host = "127.0.0.1" #"169.254.179.11"
+        self.port = 1234
+
     @pyqtSlot(tuple,bytes)
     def rxTm(self, header, data):
         if data[0] == 0xA1: # Waveform
@@ -390,32 +423,33 @@ class Window(QMainWindow):
         if self.recvThread is None:
 
             # Open the dialog to get the params
-            #host = "127.0.0.1"
-            host = "192.168.166.39"
-            port = 1234
+            dlg = SetAddressDialog(self.host, self.port)
+            if dlg.exec():
 
-            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.sock.settimeout(10)
-            try:
-                self.sock.connect((host, port))
-            except:
-                self.statusBar.showMessage("Connection to %s-%04d failed" % (host, port))
-                return
-            self.sock.settimeout(5)
+                self.host, self.port = dlg.getAddress()
 
-            self.recvThread = RecvThread(None, self.sock)
-            self.recvThread.rxTmSig.connect(self.rxTm)
-            self.recvThread.start()
+                self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.sock.settimeout(10)
+                try:
+                    self.sock.connect((self.host, self.port))
+                except:
+                    self.statusBar.showMessage("Connection to %s port %04d failed" % (self.host, self.port))
+                    return
+                self.sock.settimeout(5)
 
-            self.timer = QTimer()
-            self.timer.timeout.connect(self.tick)
-            self.timer.start(1000)
+                self.recvThread = RecvThread(None, self.sock)
+                self.recvThread.rxTmSig.connect(self.rxTm)
+                self.recvThread.start()
 
-            self.statusBar.showMessage("Connected to %s-%04d" % (host, port))
-            self.connDiscLabel.setText("CONN")
+                self.timer = QTimer()
+                self.timer.timeout.connect(self.tick)
+                self.timer.start(1000)
 
-            self.serverConnAct.setDisabled(True)
-            self.serverDiscAct.setDisabled(False)
+                self.statusBar.showMessage("Connected to %s port %04d" % (self.host, self.port))
+                self.connDiscLabel.setText("CONN")
+
+                self.serverConnAct.setDisabled(True)
+                self.serverDiscAct.setDisabled(False)
 
     def serverDisc(self):
         if self.recvThread is not None:
