@@ -29,14 +29,14 @@ class RecvThread(QThread):
 
     rxTmSig = pyqtSignal(tuple,bytes)
 
-    def __init__(self, parent, sock):
+    def __init__(self, parent, sock, repId):
 
         QThread.__init__(self, parent)
 
         self.sock = sock
         self.data = bytes()
         self.running = True
-        self.tmtowf = TmtoWF()
+        self.tmtowf = TmtoWF(repId)
 
     def run(self):
         while self.running is True:
@@ -140,10 +140,12 @@ class SetAddressDialog(QDialog):
 
         self.hostLineEdit = QLineEdit(host)
         self.portLineEdit = QLineEdit(str(port))
+        self.rpIDEdit = QLineEdit(str(0))
 
         formLayout = QFormLayout()
         formLayout.addRow("Host", self.hostLineEdit)
         formLayout.addRow("Port", self.portLineEdit)
+        formLayout.addRow("RP_ID", self.rpIDEdit)
 
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
 
@@ -159,7 +161,8 @@ class SetAddressDialog(QDialog):
     def getAddress(self):
         host = self.hostLineEdit.text()
         port = int(self.portLineEdit.text())
-        return host, port
+        rp_id = int(self.rpIDEdit.text())
+        return host, port, rp_id
 
 
 class MsgListItem(QStandardItem):
@@ -176,7 +179,7 @@ class MsgListItem(QStandardItem):
 
 class TmtoWF():
 
-    def __init__(self) -> None:
+    def __init__(self, repId) -> None:
 
 
         loggerConfig = Logger()
@@ -186,6 +189,7 @@ class TmtoWF():
 
         self.hdf5create = Hdf5Create()
         self.wformTotCount = 0
+        self.repId = repId
 
         self.q = Queue()
         self.p = Process(target=Hdf5Create.f, args=(self.hdf5create, self.q))
@@ -205,6 +209,7 @@ class TmtoWF():
     def tmToWformInit(self, header, data):
         self.wformSeqCount = header[2] & 0x3FFF
         self.wform = Waveform(runID=header[3])
+        self.wform.set_rpID(self.repId)
         self.wform.read_header(data)
 
     def tmToWformAdd(self, header, data):
@@ -321,8 +326,9 @@ class Window(QMainWindow):
         self.logWformHeader = False
         self.logWformData = False
 
-        self.host = "127.0.0.1" #"169.254.179.11"
+        self.host = "172.16.27.100" #"169.254.179.11"
         self.port = 1234
+        self.RP_ID = 0
 
     @pyqtSlot(tuple,bytes)
     def rxTm(self, header, data):
@@ -426,7 +432,7 @@ class Window(QMainWindow):
             dlg = SetAddressDialog(self.host, self.port)
             if dlg.exec():
 
-                self.host, self.port = dlg.getAddress()
+                self.host, self.port, self.RP_ID = dlg.getAddress()
 
                 self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self.sock.settimeout(10)
@@ -437,7 +443,7 @@ class Window(QMainWindow):
                     return
                 self.sock.settimeout(5)
 
-                self.recvThread = RecvThread(None, self.sock)
+                self.recvThread = RecvThread(None, self.sock, self.RP_ID)
                 self.recvThread.rxTmSig.connect(self.rxTm)
                 self.recvThread.start()
 
@@ -542,6 +548,7 @@ class Window(QMainWindow):
     def tmToWformInit(self, header, data):
         self.wformSeqCount = header[2] & 0x3FFF
         self.wform = Waveform(runID=header[3])
+        self.wform.set_rpID(self.RP_ID)
         self.wform.read_header(data)
 
     def tmToWformAdd(self, header, data):

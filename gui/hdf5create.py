@@ -57,6 +57,7 @@ class Hdf5Create():
 
         """
         try:
+            #getting metadata to first waveform in order to write hfd5 file
             first_wf = self.waveforms[0]
             date = first_wf.tstart
             dateUTC = datetime.datetime.utcfromtimestamp(date).strftime('%Y-%m-%dT%H:%M:%S.%f')
@@ -64,33 +65,50 @@ class Hdf5Create():
             runID = first_wf.runID
             configID = first_wf.configID
 
+
             
             dl0path = os.environ["DL0_INPUT"]
 
 
-            filename = f"/{dl0path}/{str(sessionID).zfill(5)}/wf_runId_{str(runID).zfill(5)}_configId_{str(configID).zfill(5)}_{dateUTC}.h5"
-            os.makedirs(f"/{dl0path}/{str(sessionID).zfill(5)}/", exist_ok=True)
+            filename = f"/{dl0path}/wf_runId_{str(runID).zfill(5)}_configId_{str(configID).zfill(5)}_{dateUTC}.h5"
+            os.makedirs(f"/{dl0path}/", exist_ok=True)
 
 
             h5file = open_file(filename, mode="w", title="dl0")
 
             group = h5file.create_group("/", 'waveforms', 'waveforms information')
 
-            atom = tables.Float32Atom()
-            shape = (16384, 2)
+            atom = tables.Int16Atom()
+            shape = (16384, 1)
             filters = tables.Filters(complevel=5, complib='zlib')
 
             for i, wf in enumerate(self.waveforms):
                 arraysy = h5file.create_carray(group, f"wf_{str(i).zfill(6)}", atom, shape, f"wf_{i}", filters=filters)
-                arraysy._v_attrs.rp_id = 1
-                arraysy._v_attrs.tstart = wf.tstart
-                arraysy._v_attrs.tend = wf.tstop
+                ##### METADATA #######
+                arraysy._v_attrs.VERSION = "2.0"
+                arraysy._v_attrs.rp_id = wf.rpId
                 arraysy._v_attrs.runid = wf.runID
                 arraysy._v_attrs.sessionID = wf.sessionID
                 arraysy._v_attrs.configID = wf.configID
-                arraysy._v_attrs.calib = 8
+                arraysy._v_attrs.TimeSts = wf.timeSts
+                arraysy._v_attrs.PPSSliceNO = wf.ppsSliceNo
+                arraysy._v_attrs.Year = wf.year
+                arraysy._v_attrs.Month = wf.month
+                arraysy._v_attrs.Day = wf.day
+                arraysy._v_attrs.HH = wf.hh
+                arraysy._v_attrs.mm = wf.mm
+                arraysy._v_attrs.ss = wf.ss
+                arraysy._v_attrs.usec = wf.usec
+                arraysy._v_attrs.Eql = wf.eql
+                arraysy._v_attrs.Dec = wf.dec
+                arraysy._v_attrs.CurrentOffset = wf.curr_off
+                arraysy._v_attrs.TriggerOffset = wf.trig_off
+                arraysy._v_attrs.SampleNo = wf.sample_no
+                arraysy._v_attrs.tstart = wf.tstart
+                arraysy._v_attrs.tend = wf.tstop
+                
 
-                arraysy[:16384, :2] = np.transpose(np.array([wf.sigt,wf.sige*-1]))[:16384, :2]
+                arraysy[:16384] = np.transpose(np.array([wf.sigr.astype(np.int16)*-1]))[:16384]
 
             
                 if i == 1: #we select only waveform 1 for quicklook analysis in gui

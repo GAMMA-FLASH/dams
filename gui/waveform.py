@@ -43,6 +43,7 @@ class Waveform:
         self.runID = runID
         self.sessionID = []
         self.configID = []
+        self.rpId = 0
 
         # Absolute time
         self.timeSts = []
@@ -219,6 +220,9 @@ class Waveform:
             return True
         else:
             return False
+        
+    def set_rpID(self, rpId):
+        self.rpId = rpId
 
     def compute_time(self):
 
@@ -259,6 +263,7 @@ class Waveform:
         print("      Run ID: %08d" % self.runID)
         print("  Session ID: %08d" % self.sessionID)
         print("  Config. ID: %08d" % self.configID)
+        print(f"      RP_ID: {self.rpId}")
         print(" Time status: %02X" % self.timeSts)
 
         if self.timeSts == 0:
