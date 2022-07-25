@@ -218,10 +218,10 @@ class TmtoWF():
         if self.wformSeqCount == seqCount:
             res = self.wform.read_data(data)
             if res:
-                self.wform.print()
+                #self.wform.print()
                 self.wformTotCount += 1
                 print("Complete waveform acquired [%d]" % self.wformTotCount) #waveform totale acquisita
-                self.logger.warning(f"Complete waveform acquired {self.wformTotCount}")
+                #self.logger.warning(f"Complete waveform acquired {self.wformTotCount}")
                 self.q.put(self.wform)
 
         else:
@@ -557,9 +557,9 @@ class Window(QMainWindow):
         if self.wformSeqCount == seqCount:
             res = self.wform.read_data(data)
             if res:
-                self.wform.print()
+                #self.wform.print()
                 self.wformTotCount += 1
-                print("Complete waveform acquired [%d]" % self.wformTotCount) #waveform totale acquisita
+                #print("Complete waveform acquired [%d]" % self.wformTotCount) #waveform totale acquisita
                 self.hdf5create.wf_append(self.wform)
                 #self.q.put(self.wform)
 

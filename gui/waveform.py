@@ -206,7 +206,7 @@ class Waveform:
 
     def read_data(self, raw):
 
-        print("Sample to read %8d" % self.sample_to_read)
+        #print("Sample to read %8d" % self.sample_to_read)
 
         # Number of samples in this block of data
         n = (len(raw)-4)/2

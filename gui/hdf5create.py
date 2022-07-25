@@ -17,7 +17,7 @@ from waveform import Waveform
 from multiprocessing import Process
 
 
-N_WFORMS = 1000
+N_WFORMS = 10000
 
 class Hdf5Create():
 
@@ -42,7 +42,7 @@ class Hdf5Create():
     def f(self, q):
         while True:
             wform = q.get()
-            self.logger.warning("ricevuta wform")
+            #self.logger.warning("ricevuta wform")
             self.wf_append(wform)
 
     def hdf5wf_create(self):
