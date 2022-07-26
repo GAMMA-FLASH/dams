@@ -60,7 +60,7 @@ class Hdf5Create():
             #getting metadata to first waveform in order to write hfd5 file
             first_wf = self.waveforms[0]
             date = first_wf.tstart
-            dateUTC = datetime.datetime.utcfromtimestamp(date).strftime('%Y-%m-%dT%H:%M:%S.%f')
+            dateUTC = datetime.datetime.utcfromtimestamp(date).strftime('%Y-%m-%dT%H_%M_%S.%f')
             sessionID = first_wf.sessionID
             runID = first_wf.runID
             configID = first_wf.configID
