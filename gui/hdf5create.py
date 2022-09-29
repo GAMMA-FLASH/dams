@@ -10,6 +10,7 @@ import numpy as np
 import json
 import pymysql.cursors
 from tables import *
+import zerosuppression
 from time import time
 from config_db import get_config
 from Logger import Logger
@@ -64,6 +65,7 @@ class Hdf5Create():
             sessionID = first_wf.sessionID
             runID = first_wf.runID
             configID = first_wf.configID
+            rpId = first_wf.rpId
 
 
             
@@ -124,7 +126,14 @@ class Hdf5Create():
             h5file.close()
 
             okfile = open(f"{filename}.ok", "w")
+            self.logger.warning("\n\n starting_zerosoppression \n\n")
+            #zerosuppression.CONVERT(filename,f"rpg{rpId}", "/data/archive/output_zs", Threshold=20, TFile="/data/gammaflash_repos/gammaflash-gui-dash/gui/weather_station/weather_station_temp.txt")
+            self.process = Process(target=zerosuppression.CONVERT, args=(filename, f"rpg{rpId}", "/data/archive/output_zs", 20, "/data/gammaflash_repos/gammaflash-gui-dash/gui/weather_station/weather_station_temp.txt"))
+            self.process.start()
             self.waveforms = []
+            
+            
+            
         except Exception as e:
             self.logger.critical(f"{e}")
             self.logger.critical(f"{traceback.print_exc()}")
