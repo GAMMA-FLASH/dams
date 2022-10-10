@@ -1,4 +1,4 @@
-# dams
+# DAMS
 Data Acquisition Modules (DAMS) is a C/Python software used for getting the GAMMA-FLASH data.
 
 ## Run
