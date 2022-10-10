@@ -26,7 +26,6 @@ class RecvThread(Thread):
         while self.running is True:
             try:
                 data = self.sock.recv(65536)
-                print(f"len data is {len(data)}")
             except:
                 print("Socket recv error")
                 continue
@@ -145,14 +144,19 @@ def start_acquisition(sock, crc_table):
 if __name__ == '__main__':
     
     #Parse inputs
-    #parser = argparse()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--rp_ip', type=str, help='The Redpitaya IP address', required=True)
+    parser.add_argument('--rp_port', type=int, help='The Redpitaya port', required=True)
+    parser.add_argument('--rp_id', type=int, help='The Redpitaya id', required=True)
+    
+    args = parser.parse_args()
     
     #Open the socket
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(10)
     try:
-        sock.connect(("172.16.27.100", 1234))
+        sock.connect((args.rp_ip, args.rp_port))
     except:
         print("ERROR: Socket connection timed out")
         quit()
@@ -161,7 +165,7 @@ if __name__ == '__main__':
 
     #Start receiving thread
 
-    recv_thread = RecvThread(sock, 0)
+    recv_thread = RecvThread(sock, args.rp_id)
 
     recv_thread.start()
 
