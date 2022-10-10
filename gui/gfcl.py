@@ -112,7 +112,7 @@ class TmtoWF():
             if res:
                 #self.wform.print()
                 self.wformTotCount += 1
-                print("Complete waveform acquired [%d]" % self.wformTotCount) #waveform totale acquisita
+                #print("Complete waveform acquired [%d]" % self.wformTotCount) #waveform totale acquisita
                 #self.logger.warning(f"Complete waveform acquired {self.wformTotCount}")
                 self.q.put(self.wform)
 
@@ -153,6 +153,8 @@ if __name__ == '__main__':
     
     #Open the socket
 
+    print("Connecting at Redpitaya socket.")
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(10)
     try:
@@ -171,10 +173,10 @@ if __name__ == '__main__':
 
     crc_table = crc32_fill_table(0x05D7B3A1)
 
-    time.sleep(10)
+    time.sleep(5)
     
     #Send starting command
-    print("start acquisition")
+    print("Start acquisition")
     start_acquisition(sock, crc_table)
 
     while True:

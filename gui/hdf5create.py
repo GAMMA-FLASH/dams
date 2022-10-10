@@ -75,7 +75,7 @@ class Hdf5Create():
             filename = f"/{dl0path}/wf_runId_{str(runID).zfill(5)}_configId_{str(configID).zfill(5)}_{dateUTC}.h5"
             os.makedirs(f"/{dl0path}/", exist_ok=True)
 
-
+            self.logger.warning(f"Producing HDF5: {filename}")
             h5file = open_file(filename, mode="w", title="dl0")
 
             group = h5file.create_group("/", 'waveforms', 'waveforms information')
@@ -124,9 +124,10 @@ class Hdf5Create():
                     self.conn.commit()
             
             h5file.close()
+            self.logger.warning(f"Written new HDF5: {filename}")
 
             okfile = open(f"{filename}.ok", "w")
-            self.logger.warning("\n\n starting_zerosoppression \n\n")
+            self.logger.warning("Starting zerosoppression algorithm")
             #zerosuppression.CONVERT(filename,f"rpg{rpId}", "/data/archive/output_zs", Threshold=20, TFile="/data/gammaflash_repos/gammaflash-gui-dash/gui/weather_station/weather_station_temp.txt")
             self.process = Process(target=zerosuppression.CONVERT, args=(filename, f"rpg{rpId}", "/data/archive/output_zs", 20, "/data/gammaflash_repos/gammaflash-gui-dash/gui/weather_station/weather_station_temp.txt"))
             self.process.start()
