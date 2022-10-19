@@ -5,5 +5,5 @@ Data Acquisition Modules (DAMS) is a C/Python software used for getting the GAMM
 
 To run the acquisition 
 ```
-python gfcl.py --rp_ip X.X.X.X --rp_port Y --rp_id Z
+python gfcl.py --rp_ip X.X.X.X --rp_port Y --rp_id Z --outdir "outdir" --nwfs 10000
 ```

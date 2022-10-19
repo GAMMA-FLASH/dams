@@ -13,14 +13,14 @@ from multiprocessing import Process, Queue
 
 class RecvThread(Thread):
     
-    def __init__(self, sock, rep_id):
+    def __init__(self, sock, rep_id, outdir, nwfs):
 
         Thread.__init__(self)
         self.sock = sock
         self.rep_id = rep_id
         self.data = bytes()
         self.running = True
-        self.tmtowf = TmtoWF(rep_id)
+        self.tmtowf = TmtoWF(rep_id, outdir, nwfs)
 
     def run(self):
         while self.running is True:
@@ -71,7 +71,7 @@ class RecvThread(Thread):
 
 class TmtoWF():
 
-    def __init__(self, repId) -> None:
+    def __init__(self, repId, outdir, nwfs) -> None:
 
 
         loggerConfig = Logger()
@@ -79,7 +79,7 @@ class TmtoWF():
         
         self.logger = Logger().getLogger(__name__)
 
-        self.hdf5create = Hdf5Create()
+        self.hdf5create = Hdf5Create(outdir, nwfs)
         self.wformTotCount = 0
         self.repId = repId
 
@@ -148,6 +148,9 @@ if __name__ == '__main__':
     parser.add_argument('--rp_ip', type=str, help='The Redpitaya IP address', required=True)
     parser.add_argument('--rp_port', type=int, help='The Redpitaya port', required=True)
     parser.add_argument('--rp_id', type=int, help='The Redpitaya id', required=True)
+    parser.add_argument('--outdir', type=str, help='Output Directory', required=True)
+    parser.add_argument('--nwfs', type=int, help='Waveforms contained in HDF5 file', required=True)
+    
     
     args = parser.parse_args()
     
@@ -167,7 +170,7 @@ if __name__ == '__main__':
 
     #Start receiving thread
 
-    recv_thread = RecvThread(sock, args.rp_id)
+    recv_thread = RecvThread(sock, args.rp_id, args.outdir, args.nwfs)
 
     recv_thread.start()
 

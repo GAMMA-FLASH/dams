@@ -18,14 +18,14 @@ from waveform import Waveform
 from multiprocessing import Process
 
 
-N_WFORMS = 10000
-
 class Hdf5Create():
 
-    def __init__(self) -> None:
+    def __init__(self, outdir, nwfs) -> None:
         self.waveforms = []
         self.logger = Logger().getLogger(__name__)
         conf_dict = get_config()
+        self.outdir = outdir
+        self.nwfs = nwfs
 
         self.conn = pymysql.connect(host=conf_dict["db_host"], user=conf_dict["db_user"], \
             password=conf_dict["db_pass"], db=conf_dict["db_results"], \
@@ -37,7 +37,7 @@ class Hdf5Create():
     def wf_append(self, wf):
         self.waveforms.append(wf)
 
-        if len(self.waveforms) == N_WFORMS:
+        if len(self.waveforms) == self.nwfs:
             self.hdf5wf_create()
 
     def f(self, q):
@@ -69,7 +69,7 @@ class Hdf5Create():
 
 
             
-            dl0path = os.environ["DL0_INPUT"]
+            dl0path = self.outdir
 
 
             filename = f"/{dl0path}/wf_runId_{str(runID).zfill(5)}_configId_{str(configID).zfill(5)}_{dateUTC}.h5"
@@ -127,10 +127,10 @@ class Hdf5Create():
             self.logger.warning(f"Written new HDF5: {filename}")
 
             okfile = open(f"{filename}.ok", "w")
-            self.logger.warning("Starting zerosoppression algorithm")
+            #self.logger.warning("Starting zerosoppression algorithm")
             #zerosuppression.CONVERT(filename,f"rpg{rpId}", "/data/archive/output_zs", Threshold=20, TFile="/data/gammaflash_repos/gammaflash-gui-dash/gui/weather_station/weather_station_temp.txt")
-            self.process = Process(target=zerosuppression.CONVERT, args=(filename, f"rpg{rpId}", "/data/archive/output_zs", 20, "/data/gammaflash_repos/gammaflash-gui-dash/gui/weather_station/weather_station_temp.txt"))
-            self.process.start()
+            #self.process = Process(target=zerosuppression.CONVERT, args=(filename, f"rpg{rpId}", "/data/archive/output_zs", 20, "/data/gammaflash_repos/gammaflash-gui-dash/gui/weather_station/weather_station_temp.txt"))
+            #self.process.start()
             self.waveforms = []
             
             
