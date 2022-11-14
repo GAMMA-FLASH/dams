@@ -8,7 +8,6 @@ import datetime
 import traceback
 import numpy as np
 import json
-import pymysql.cursors
 from tables import *
 import zerosuppression
 from time import time
@@ -27,11 +26,13 @@ class Hdf5Create():
         self.outdir = outdir
         self.nwfs = nwfs
 
+        """
         self.conn = pymysql.connect(host=conf_dict["db_host"], user=conf_dict["db_user"], \
             password=conf_dict["db_pass"], db=conf_dict["db_results"], \
             port=int(conf_dict["db_port"]), cursorclass=pymysql.cursors.DictCursor)
 
         self.cursor = self.conn.cursor()
+        """
 
 
     def wf_append(self, wf):
@@ -112,7 +113,7 @@ class Hdf5Create():
 
                 arraysy[:16384] = np.transpose(np.array([wf.sigr.astype(np.int16)*-1]))[:16384]
 
-            
+                """
                 if i == 1: #we select only waveform 1 for quicklook analysis in gui
                     dict_wf = {"x": wf.sigt.tolist(), "y": (wf.sige*-1).tolist()}
                     json_wf = json.dumps(dict_wf)
@@ -122,7 +123,7 @@ class Hdf5Create():
                     self.cursor.execute(query)
 
                     self.conn.commit()
-            
+                """
             h5file.close()
             self.logger.warning(f"Written new HDF5: {filename}")
 
