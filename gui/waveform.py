@@ -1,7 +1,6 @@
 import struct
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib import rcParams
+import time
 
 # RedPitaya ADC is 14 bit, raw samples are returned in 2's complement
 # In general N-bit two's complement number spans [−2^(N−1), 2^(N−1) − 1],
@@ -37,42 +36,48 @@ def int_to_twos_comp(val, bits):
 class Waveform:
     """GAMMA_FLASH Waveform handling"""
 
-    def __init__(self,runID=[]):
+    def __init__(self,trx=None,rpID=None,runID=None):
+
+        # Receive/creation time in secs past January 1, 1970, 00:00:00 (UTC)
+        if trx is None:
+            self.trx = time.time()
+        else:
+            self.trx = trx
 
         # Operation identification
+        self.rpID = rpID
         self.runID = runID
-        self.sessionID = []
-        self.configID = []
-        self.rpId = 0
+        self.sessionID = None
+        self.configID = None
 
         # Absolute time
-        self.timeSts = []
-        self.ppsSliceNo = []
-        self.year = []
-        self.month = []
-        self.day = []
-        self.hh = []
-        self.mm = []
-        self.ss = []
-        self.usec = []
+        self.timeSts = None
+        self.ppsSliceNo = None
+        self.year = None
+        self.month = None
+        self.day = None
+        self.hh = None
+        self.mm = None
+        self.ss = None
+        self.usec = None
 
         # Waveform info
-        self.tstmp = []
-        self.eql = []
-        self.dec = []
-        self.curr_off = []
-        self.trig_off = []
-        self.sample_no = []
+        self.tstmp = None
+        self.eql = None
+        self.dec = None
+        self.curr_off = None
+        self.trig_off = None
+        self.sample_no = None
 
         # Derived data
-        self.tstart = []
-        self.tstop = []
-        self.dt = []
-        self.data = []
-        self.trigt = []
-        self.sigt = []
-        self.sigr = []
-        self.sige = []
+        self.tstart = None
+        self.tstop = None
+        self.dt = None
+        self.data = None
+        self.trigt = None
+        self.sigt = None
+        self.sigr = None
+        self.sige = None
 
     def load_header(self, fname):
         with open(fname, "rb") as f:
@@ -220,9 +225,6 @@ class Waveform:
             return True
         else:
             return False
-        
-    def set_rpID(self, rpId):
-        self.rpId = rpId
 
     def compute_time(self):
 
@@ -233,7 +235,7 @@ class Waveform:
         self.tstart = float(self.tstmp[0]) + float(self.tstmp[1]) * 1e-9
         self.tstop = self.tstart + self.dt * (self.sample_no - 1)
 
-    def compute_sig(self):
+    def compute_sig(self,eng_sig=True):
 
         # Reordering
         curr_off = self.curr_off + 1
@@ -246,24 +248,27 @@ class Waveform:
 
         self.trigt = len(pre_trig) * self.dt
 
-        self.sigt = np.zeros(self.sample_no)
-        self.sigr = np.zeros(self.sample_no)
-        count = 0
-        for raw in pre_trig + post_trig:
-            self.sigt[count] = count * self.dt
-            self.sigr[count] = twos_comp_to_int(raw, 14)
-            count += 1
-
-        if self.eql == 1:
-            self.sige = self.sigr * 2.0 / 16384
-        else:
-            self.sige = self.sigr * 40.0 / 16384
+        if eng_sig: # Raw and engineering signal
+            self.sigt = np.zeros(self.sample_no)
+            self.sigr = np.zeros(self.sample_no, dtype=np.int16)
+            count = 0
+            for raw in pre_trig + post_trig:
+                self.sigt[count] = count * self.dt
+                self.sigr[count] = twos_comp_to_int(raw, 14)
+                count += 1
+            if self.eql == 1:
+                self.sige = self.sigr * 2.0 / 16384
+            else:
+                self.sige = self.sigr * 40.0 / 16384
+        else: # Only raw data
+            self.sigr = np.zeros(self.sample_no, dtype=np.int16)
+            for raw in pre_trig + post_trig:
+                self.sigr[count] = twos_comp_to_int(raw, 14)
 
     def print(self):
         print("      Run ID: %08d" % self.runID)
         print("  Session ID: %08d" % self.sessionID)
         print("  Config. ID: %08d" % self.configID)
-        print(f"      RP_ID: {self.rpId}")
         print(" Time status: %02X" % self.timeSts)
 
         if self.timeSts == 0:
@@ -285,6 +290,9 @@ class Waveform:
 
 
 if __name__ == "__main__":
+
+    import matplotlib.pyplot as plt
+    from matplotlib import rcParams
 
     print("Load GF binary data")
 
