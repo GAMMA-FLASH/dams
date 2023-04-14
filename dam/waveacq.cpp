@@ -159,7 +159,6 @@ void *acqThreadFcn(void *ptr) {
 	osc_fpga_set_trigger_delay(g_configInfo.oscTrigDelay);
 	osc_fpga_set_trigger_debounce(g_configInfo.oscTrigDebounce);
 	
-	
     // INFINITE LOOP
     for(;;) {
     	
@@ -207,12 +206,13 @@ void *acqThreadFcn(void *ptr) {
 			m_fifo.pushRelease();
 			
 			g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_TRG_ERR);
-			g_systemInfo.totAcqWaveCount++;
-			g_systemInfo.waveCount++;
+			
+			g_systemInfo.totAcqWformCount++;
+			g_systemInfo.acqWformCount++;
 			
 			// Terminate the acquisition
 			if (g_systemInfo.maxWaveNo > 0) {
-				if (g_systemInfo.waveCount >= g_systemInfo.maxWaveNo) {
+				if (g_systemInfo.acqWformCount >= g_systemInfo.maxWaveNo) {
 					
 					// Wait to send all the data in the FIFO
 					sleep(2);
@@ -254,13 +254,26 @@ void *sendThreadFcn(void *ptr) {
             sleep(1);
         } else {
         
+        	TRACE("WaveAcq::sendThreadFcn: savedWformCount %d\n", g_systemInfo.savedWformCount);
+        
+        	if (g_configInfo.cfgSaveWform) {
+        		if (g_systemInfo.savedWformCount == 0) {
+        			g_dataStore.openFile();
+        		}
+        	}
+        
             g_tcHandler.sendWaveform(buff, FIFO_BUFF_SZ);
-            
-            g_systemInfo.totSentWaveCount++;
             
             m_fifo.popRelease();
             
-            //TRACE("WaveAcq::sendThreadFcn: pop release %6d\n", g_systemInfo.totSentWaveCount);
+            if (g_configInfo.cfgSaveWform) {
+            	if (g_systemInfo.savedWformCount >= (uint32_t)g_configInfo.cfgSaveWformNo) {
+            		g_dataStore.closeFile();
+            		g_systemInfo.savedWformCount = 0;
+            	}
+            }
+            
+            TRACE("WaveAcq::sendThreadFcn: pop release %6d\n", g_systemInfo.totSentWaveCount);
             
         }
         

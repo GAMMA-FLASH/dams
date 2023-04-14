@@ -34,9 +34,6 @@ int TcHandler::execStartAcq(Header *tcHeader) {
         // Clear trigger error flag
         g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_TRG_ERR);
         
-        // Clear the waveform counter
-        g_systemInfo.waveCount = 0;
-        
         TRACE("TcHandler::execStartAcq: source %d maxWaveNo %d waitUsecs %d\n", g_systemInfo.source, g_systemInfo.maxWaveNo, g_systemInfo.waitUsecs);
         
         // Increment the run ID
@@ -46,6 +43,13 @@ int TcHandler::execStartAcq(Header *tcHeader) {
 			sendTcExec(tcHeader, TC_EX_ERR_RUPDFAIL);
 			return 0;
 		}
+		
+		// Update counters
+		g_systemInfo.acqWformCount = 0;
+		g_systemInfo.sentWformCount = 0;
+		g_systemInfo.savedWformCount = 0;
+    	g_systemInfo.fileCount = 0;
+		g_dataStore.init(); 
 		
 		TRACE("TcHandler::execStartAcq: run ID %d\n", g_configInfo.damRunID);
         

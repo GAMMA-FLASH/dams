@@ -90,7 +90,7 @@ static inline void gga_read() {
 		
 		if (g_uart_buff[1] == 'G') {
 		
-			if (g_uart_buff[2] == 'N') {
+			if (g_uart_buff[2] == 'P') {
 				
 				if (g_uart_buff[3] == 'G') { // GGA
 				

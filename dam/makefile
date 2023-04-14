@@ -1,4 +1,4 @@
-CFLAGS  = -g -Wall -Werror -std=c++11
+CFLAGS  = -Wall -Werror -std=c++11
 CFLAGS += -I/opt/redpitaya/include
 LDFLAGS = -L/opt/redpitaya/lib
 LDLIBS = -lm -lpthread -lrp -lstdc++

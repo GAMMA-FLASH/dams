@@ -40,7 +40,8 @@ int TcHandler::sendHk() {
         	data->subType  = Data_Hk::SUB_TYPE;
             data->state = g_systemInfo.state;
             data->flags = g_systemInfo.flags;
-            data->waveCount = g_systemInfo.waveCount;
+            data->waveCount = g_systemInfo.totAcqWformCount;
+            g_systemInfo.totAcqWformCount = 0;
     
             //data->encode();
             header->encode();
