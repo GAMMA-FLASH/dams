@@ -2,20 +2,23 @@ import sys
 import time
 import socket
 import struct
-import matplotlib
-from Logger import Logger
+
+from PyQt5.QtGui import QFont, QPainter, QColor, QPixmap, QStandardItemModel, QStandardItem
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
-from waveform import Waveform
-from matplotlib import rcParams
-from hdf5create import Hdf5Create
-from matplotlib.figure import Figure
-from crc32 import crc32_fill_table, crc32
-from multiprocessing import Process, Queue
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-from PyQt5.QtGui import QFont, QPainter, QColor, QPixmap, QStandardItemModel, QStandardItem
 
+import matplotlib
 matplotlib.use('Qt5Agg')
+
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
+
+from matplotlib import rcParams
+
+from crc32 import crc32_fill_table, crc32
+
+from waveform import Waveform
+
 rcParams['font.family'] = 'arial'
 
 def printBuff(pref,data):
@@ -29,14 +32,13 @@ class RecvThread(QThread):
 
     rxTmSig = pyqtSignal(tuple,bytes)
 
-    def __init__(self, parent, sock, repId):
+    def __init__(self, parent, sock):
 
         QThread.__init__(self, parent)
 
         self.sock = sock
         self.data = bytes()
         self.running = True
-        self.tmtowf = TmtoWF(repId)
 
     def run(self):
         while self.running is True:
@@ -70,10 +72,8 @@ class RecvThread(QThread):
                         # [5] CRC (uint32)
                         header = struct.unpack("<BBHHHI", self.data[off:off + 12])
                         data_off = off + 12
-                        
                         if len(self.data) - data_off >= header[4]:
-                            #self.rxTmSig.emit(header, self.data[data_off:data_off + header[4]])
-                            self.tmtowf.tmtowf_nogui(header, self.data[data_off:data_off + header[4]])
+                            self.rxTmSig.emit(header, self.data[data_off:data_off + header[4]])
                             off = data_off + header[4]
                         else:
                             self.data = self.data[off:]
@@ -131,6 +131,7 @@ class StartAcqDialog(QDialog):
         layout.addWidget(buttonBox)
         self.setLayout(layout)
 
+
 class SetAddressDialog(QDialog):
     def __init__(self,host,port):
         super().__init__()
@@ -140,12 +141,10 @@ class SetAddressDialog(QDialog):
 
         self.hostLineEdit = QLineEdit(host)
         self.portLineEdit = QLineEdit(str(port))
-        self.rpIDEdit = QLineEdit(str(0))
 
         formLayout = QFormLayout()
         formLayout.addRow("Host", self.hostLineEdit)
         formLayout.addRow("Port", self.portLineEdit)
-        formLayout.addRow("RP_ID", self.rpIDEdit)
 
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
 
@@ -161,8 +160,7 @@ class SetAddressDialog(QDialog):
     def getAddress(self):
         host = self.hostLineEdit.text()
         port = int(self.portLineEdit.text())
-        rp_id = int(self.rpIDEdit.text())
-        return host, port, rp_id
+        return host, port
 
 
 class MsgListItem(QStandardItem):
@@ -175,59 +173,6 @@ class MsgListItem(QStandardItem):
         self.setBackground(bcolor)
         self.setFont(fnt)
         self.setText(txt)
-
-
-class TmtoWF():
-
-    def __init__(self, repId) -> None:
-
-
-        loggerConfig = Logger()
-        loggerConfig.set_logger()
-        
-        self.logger = Logger().getLogger(__name__)
-
-        self.hdf5create = Hdf5Create()
-        self.wformTotCount = 0
-        self.repId = repId
-
-        self.q = Queue()
-        self.p = Process(target=Hdf5Create.f, args=(self.hdf5create, self.q))
-        self.p.start()
-
-    def tmtowf_nogui(self, header, data):
-        if data[0] == 0xA1: # Waveform
-            if data[1] == 0x01: # Waveform header
-                #self.tmToLog(header, data)
-                self.tmToWformInit(header, data)
-            else: # Waveform data
-                self.tmToWformAdd(header, data)
-        else:
-            pass
-            #self.tmToLog(header, data)
-
-    def tmToWformInit(self, header, data):
-        self.wformSeqCount = header[2] & 0x3FFF
-        self.wform = Waveform(runID=header[3])
-        self.wform.set_rpID(self.repId)
-        self.wform.read_header(data)
-
-    def tmToWformAdd(self, header, data):
-        seqCount = header[2] & 0x3FFF
-        self.wformSeqCount += 1
-        if self.wformSeqCount == seqCount:
-            res = self.wform.read_data(data)
-            if res:
-                #self.wform.print()
-                self.wformTotCount += 1
-                print("Complete waveform acquired [%d]" % self.wformTotCount) #waveform totale acquisita
-                #self.logger.warning(f"Complete waveform acquired {self.wformTotCount}")
-                self.q.put(self.wform)
-
-        else:
-            print("Sequence error: cur %6d exp %6d" % (seqCount, self.wformSeqCount))
-
-    
 
 
 class Window(QMainWindow):
@@ -326,9 +271,8 @@ class Window(QMainWindow):
         self.logWformHeader = False
         self.logWformData = False
 
-        self.host = "172.16.27.100" #"169.254.179.11"
+        self.host = "127.0.0.1" #"169.254.179.11"
         self.port = 1234
-        self.RP_ID = 0
 
     @pyqtSlot(tuple,bytes)
     def rxTm(self, header, data):
@@ -432,7 +376,7 @@ class Window(QMainWindow):
             dlg = SetAddressDialog(self.host, self.port)
             if dlg.exec():
 
-                self.host, self.port, self.RP_ID = dlg.getAddress()
+                self.host, self.port = dlg.getAddress()
 
                 self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self.sock.settimeout(10)
@@ -443,7 +387,7 @@ class Window(QMainWindow):
                     return
                 self.sock.settimeout(5)
 
-                self.recvThread = RecvThread(None, self.sock, self.RP_ID)
+                self.recvThread = RecvThread(None, self.sock)
                 self.recvThread.rxTmSig.connect(self.rxTm)
                 self.recvThread.start()
 
@@ -548,7 +492,6 @@ class Window(QMainWindow):
     def tmToWformInit(self, header, data):
         self.wformSeqCount = header[2] & 0x3FFF
         self.wform = Waveform(runID=header[3])
-        self.wform.set_rpID(self.RP_ID)
         self.wform.read_header(data)
 
     def tmToWformAdd(self, header, data):
@@ -557,12 +500,9 @@ class Window(QMainWindow):
         if self.wformSeqCount == seqCount:
             res = self.wform.read_data(data)
             if res:
-                #self.wform.print()
+                self.wform.print()
                 self.wformTotCount += 1
-                #print("Complete waveform acquired [%d]" % self.wformTotCount) #waveform totale acquisita
-                self.hdf5create.wf_append(self.wform)
-                #self.q.put(self.wform)
-
+                print("Complete waveform acquired [%d]" % self.wformTotCount)
                 self.mplCanvas.axes.cla()
                 self.mplCanvas.axes.plot(self.wform.sigt, self.wform.sige)
                 self.mplCanvas.axes.axvline(x=self.wform.trigt, color="black", linestyle=(0, (5, 5)))
