@@ -1,6 +1,7 @@
 import struct
-import numpy as np
 import time
+import math
+import numpy as np
 
 # RedPitaya ADC is 14 bit, raw samples are returned in 2's complement
 # In general N-bit two's complement number spans [−2^(N−1), 2^(N−1) − 1],
@@ -21,6 +22,7 @@ import time
 # 0x3FFE =  16382 = -2
 # 0x3FFF =  16383 = -1
 
+
 def twos_comp_to_int(val, bits):
     if (val & (1 << (bits - 1))) != 0: # if sign bit is set e.g., 8bit: 128-255
         val = val - (1 << bits)        # compute negative value
@@ -33,12 +35,19 @@ def int_to_twos_comp(val, bits):
     return val
 
 
+def hex_to_str(data):
+    str = ''
+    for b in data:
+        str += '%02X' % b
+    return str
+
+
 class Waveform:
     """GAMMA_FLASH Waveform handling"""
 
     def __init__(self,trx=None,rpID=None,runID=None):
 
-        # Receive/creation time in secs past January 1, 1970, 00:00:00 (UTC)
+        # Receive time in secs past January 1, 1970, 00:00:00 (UTC)
         if trx is None:
             self.trx = time.time()
         else:
@@ -78,6 +87,13 @@ class Waveform:
         self.sigt = None
         self.sigr = None
         self.sige = None
+
+    def __str__(self):
+        time_str1 = time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime(self.trx))
+        sns = math.modf(self.trx)
+        usec = round(sns[0] * 1e6)
+        time_str2 = '%06d' % usec
+        return 'WF %s.%s [%4d,%4d,%4d,%4d] %12d %9d' % (time_str1, time_str2,  self.rpID, self.runID, self.sessionID, self.configID, self.tstmp[0], self.tstmp[1])
 
     def load_header(self, fname):
         with open(fname, "rb") as f:
@@ -209,7 +225,7 @@ class Waveform:
 
         self.compute_time()
 
-    def read_data(self, raw):
+    def read_data(self, raw, compute_signal=True):
 
         #print("Sample to read %8d" % self.sample_to_read)
 
@@ -221,7 +237,8 @@ class Waveform:
 
         self.sample_to_read -= n
         if self.sample_to_read == 0:
-            self.compute_sig()
+            if compute_signal: # This is not needed to produce DL0
+                self.compute_sig()
             return True
         else:
             return False
@@ -231,11 +248,13 @@ class Waveform:
         # Sampling time
         self.dt = float(self.dec) * 8e-9
 
+        #print(self.tstmp)
+
         # Time of the first and last samples
         self.tstart = float(self.tstmp[0]) + float(self.tstmp[1]) * 1e-9
         self.tstop = self.tstart + self.dt * (self.sample_no - 1)
 
-    def compute_sig(self,eng_sig=True):
+    def compute_sig(self):
 
         # Reordering
         curr_off = self.curr_off + 1
@@ -248,27 +267,28 @@ class Waveform:
 
         self.trigt = len(pre_trig) * self.dt
 
-        if eng_sig: # Raw and engineering signal
-            self.sigt = np.zeros(self.sample_no)
-            self.sigr = np.zeros(self.sample_no, dtype=np.int16)
-            count = 0
-            for raw in pre_trig + post_trig:
-                self.sigt[count] = count * self.dt
-                self.sigr[count] = twos_comp_to_int(raw, 14)
-                count += 1
-            if self.eql == 1:
-                self.sige = self.sigr * 2.0 / 16384
-            else:
-                self.sige = self.sigr * 40.0 / 16384
-        else: # Only raw data
-            self.sigr = np.zeros(self.sample_no, dtype=np.int16)
-            for raw in pre_trig + post_trig:
-                self.sigr[count] = twos_comp_to_int(raw, 14)
+        self.sigt = np.zeros(self.sample_no)
+        self.sigr = np.zeros(self.sample_no)
+        count = 0
+        for raw in pre_trig + post_trig:
+            self.sigt[count] = count * self.dt
+            self.sigr[count] = twos_comp_to_int(raw, 14)
+            count += 1
+
+        if self.eql == 1:
+            self.sige = self.sigr * 2.0 / 16384
+        else:
+            self.sige = self.sigr * 40.0 / 16384
 
     def print(self):
+
+        if self.rpID:
+            print("RedPitaya ID: %02d" % self.rpID)
+
         print("      Run ID: %08d" % self.runID)
         print("  Session ID: %08d" % self.sessionID)
         print("  Config. ID: %08d" % self.configID)
+
         print(" Time status: %02X" % self.timeSts)
 
         if self.timeSts == 0:
@@ -288,11 +308,13 @@ class Waveform:
         print("Trigger off.: %22d" % self.trig_off)
         print("  Sample no.: %22d" % self.sample_no)
 
+'''
+
+import matplotlib.pyplot as plt
+from matplotlib import rcParams
+
 
 if __name__ == "__main__":
-
-    import matplotlib.pyplot as plt
-    from matplotlib import rcParams
 
     print("Load GF binary data")
 
@@ -336,3 +358,5 @@ if __name__ == "__main__":
     #plt.savefig("test.png")
 
     plt.show()
+    
+'''
