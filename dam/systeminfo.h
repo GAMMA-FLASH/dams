@@ -33,7 +33,6 @@ public:
     uint32_t flags;
     
     // Total acquired wforms since start
-    //uint32_t totAcqWformCount;
     std::atomic<unsigned int>  totAcqWformCount;
     
     // Counter used to sto acquisition

@@ -273,7 +273,7 @@ void *sendThreadFcn(void *ptr) {
             	}
             }
             
-            TRACE("WaveAcq::sendThreadFcn: pop release %6d\n", g_systemInfo.totSentWaveCount);
+            TRACE("WaveAcq::sendThreadFcn: pop release %6d\n", g_systemInfo.sentWformCount);
             
         }
         
