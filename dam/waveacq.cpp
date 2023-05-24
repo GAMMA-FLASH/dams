@@ -57,7 +57,7 @@ void *testAcqThreadFcn(void *ptr) {
         
         m_fifo.pushRelease();
         
-        //TRACE("WaveAcq::acqThreadFcn: push waveform\n");
+        TRACE("WaveAcq::acqThreadFcn: push waveform\n");
         
         sleep(1);
         
