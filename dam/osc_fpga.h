@@ -126,8 +126,9 @@ typedef struct {
 
     /* off   [0x14] Data decimation
      * bits [31:16] - Reserved
-     * bits  [15:0] - Decimation factor, legal values: 1, 8, 64, 1024, 8192 65536
-     * If other values are written data is undefined 
+     * bits  [15:0] - Decimation factor, standard values: 1, 8, 64, 1024, 8192 65536
+     * Average is applied to decimated data
+     * Values 1, 2, 4, 8 are supported for values less than 16. Above 16, averaging of any number of samples is supported.
      */
     uint32_t data_dec;
 
