@@ -1,15 +1,17 @@
-import sys
 import os
+import sys
 import socket
-from threading import Thread
-from time import sleep
-import h5py
 import struct
-import argparse
-import time
 import math
+from time import sleep
 
-from waveform import Waveform, int_to_twos_comp, hex_to_str
+import argparse
+
+from threading import Thread
+
+import h5py
+
+from waveform import Waveform, int_to_twos_comp
 from crc32 import crc32_fill_table, crc32
 
 
@@ -20,15 +22,32 @@ def data_to_str(data):
     return "[%02d] 0x%s" % (len(data), msg)
 
 
-def ds_to_wform(ds):
+def ds_to_wform(ds,rpID=None,runID=None,sessionID=None,configID=None):
 
     arr = ds[:]
 
+    # trx is set using the current time since the std epoch
     wform = Waveform()
-    wform.rpID = ds.attrs['rp_id']
-    wform.runID = ds.attrs['runid']
-    wform.sessionID = ds.attrs['sessionID']
-    wform.configID = ds.attrs['configID']
+
+    if rpID:
+        wform.rpID = rpID
+    else:
+        wform.rpID = ds.attrs['rp_id']
+
+    if runID:
+        wform.runID = runID
+    else:
+        wform.runID = ds.attrs['runid']
+
+    if sessionID:
+        wform.sessionID = sessionID
+    else:
+        wform.sessionID = ds.attrs['sessionID']
+
+    if configID:
+        wform.configID = configID
+    else:
+        wform.configID = ds.attrs['configID']
 
     wform.timeSts = ds.attrs['TimeSts']
     wform.ppsSliceNo = ds.attrs['PPSSliceNO']
@@ -40,16 +59,15 @@ def ds_to_wform(ds):
     wform.ss = ds.attrs['ss']
     wform.usec = ds.attrs['usec']
 
-    t = math.modf(time.time())
-    wform.tstmp = (int(t[1]), int(t[0] * 1e9))
+    # Time stamp is represented with a C/C++ timespec structure, hence
+    # the Waveform creation time since std epoch in seconds is used
+    # and converted into sec/nsec
+    # NOTE: sec is set one second before the trx
+    t = math.modf(wform.trx)
+    wform.tstmp = (int(t[1]) - 1, round(t[0] * 1e9))
 
     wform.eql = ds.attrs['Eql']
     wform.dec = ds.attrs['Dec']
-
-    '''
-    curr_off =  ds.attrs['CurrentOffset']
-    trig_off =  ds.attrs['TriggerOffset']
-    '''
 
     # The buffer is already ordered
     wform.curr_off = arr.shape[0]-1
@@ -57,10 +75,9 @@ def ds_to_wform(ds):
 
     wform.sample_no = arr.shape[0]
 
-    #wform.tstart = ds.attrs['tstart']
-    #wform.tstop = ds.attrs['tend']
     wform.dt = float(wform.dec) * 8e-9
 
+    # First/last sample time
     wform.tstart = float(wform.tstmp[0]) + float(wform.tstmp[1]) * 1e-9
     wform.tstop = wform.tstart + wform.dt * (wform.sample_no - 1)
 
@@ -83,7 +100,6 @@ def ds_to_wform(ds):
         for val in pre2 + post + pre1:
             wform.data += (int_to_twos_comp(val, 14),)
     else:
-        l = wform.trig_off - wform.curr_off + 1
         pre = tpl[0:curr_off]
         post1 = tpl[curr_off:wform.trig_off]
         post2 = tpl[wform.trig_off:]
@@ -114,11 +130,11 @@ U32_x_PACKET = 1020
 
 SAMPLES_X_PACKET = 2*U32_x_PACKET
 
-def create_header_packet(wform, src, npkt, crc_table):
+def create_header_packet(wform, srcid, npkt, crc_table):
 
     start = struct.pack("<B", START)
-    apid = struct.pack("<B", CLASS_TM+src)
-    seq = struct.pack("<H", GROUP_FIRST+npkt)
+    apid = struct.pack("<B", CLASS_TM + srcid)
+    seq = struct.pack("<H", GROUP_FIRST + npkt)
 
     runid = struct.pack("<H", wform.runID)
     size = struct.pack("<H", 44)
@@ -196,7 +212,7 @@ def create_header_packet(wform, src, npkt, crc_table):
     return pkt
 
 
-def create_data_packet(wform, src, off, npkt, crc_table):
+def create_data_packet(wform, srcid, off, npkt, crc_table):
 
     nsmp = wform.sample_no - off
     if nsmp >= SAMPLES_X_PACKET:
@@ -213,7 +229,7 @@ def create_data_packet(wform, src, off, npkt, crc_table):
         grp = GROUP_CONT
 
     start = struct.pack("<B", START)
-    apid = struct.pack("<B", CLASS_TM + src)
+    apid = struct.pack("<B", CLASS_TM + srcid)
     seq = struct.pack("<H", grp + npkt)
 
     runid = struct.pack("<H", wform.runID)
@@ -239,19 +255,19 @@ def create_data_packet(wform, src, off, npkt, crc_table):
     return off, pkt
 
 
-def wform_to_packets(wform, src_id, npkt, crc_table):
+def wform_to_packets(wform, srcid, npkt, crc_table):
 
     pkt = []
 
     # Create header packet
-    hpkt = create_header_packet(wform, src_id, npkt, crc_table)
+    hpkt = create_header_packet(wform, srcid, npkt, crc_table)
     npkt += 1
     pkt.append(hpkt)
 
     # Create data packets
     off = 0
     while off < wform.sample_no:
-        off, dpkt = create_data_packet(wform, src_id, off, npkt, crc_table)
+        off, dpkt = create_data_packet(wform, srcid, off, npkt, crc_table)
         npkt += 1
         pkt.append(dpkt)
 
@@ -279,16 +295,22 @@ def create_hk(state, flags, wform_count, crc_table):
 
     return header + data
 
+
 class SendThread(Thread):
 
-    def __init__(self, conn, crc_table, dname):
+    def __init__(self, conn, crc_table, dname, rpid, wform_dt, hk_rel_no, pkt_delay):
 
         Thread.__init__(self)
         self.conn = conn
         self.crc_table = crc_table
         self.dname = dname
+        self.rpid = rpid
         self.wform_count = 0
         self.hk_count = 0
+        self.wform_dt = wform_dt
+        self.hk_rel_no = hk_rel_no
+        self.pkt_delay = pkt_delay
+
         self.running = True
 
     def run(self):
@@ -316,22 +338,23 @@ class SendThread(Thread):
 
                         ds = group[key]
                         wform = ds_to_wform(ds)
-                        npkt, pkt = wform_to_packets(wform, 0, npkt, self.crc_table)
+
+                        npkt, pkt = wform_to_packets(wform, self.rpid, npkt, self.crc_table)
 
                         for cur_pkt in pkt:
                             self.conn.send(cur_pkt)
-                            sleep(10/1000)
+                            sleep(self.pkt_delay)
 
                         self.wform_count += 1
                         self.hk_count += 1
 
-                        if self.hk_count == 5:
+                        if self.hk_count == self.hk_rel_no:
                             hk_pkt = create_hk(0x03, 0x80, self.wform_count, crc_table)
                             self.conn.send(hk_pkt)
-                            sleep(10 / 1000)
+                            sleep(self.pkt_delay)
                             self.hk_count = 0
 
-                        sleep(1)
+                        sleep(self.wform_dt)
 
                     else:
                         break
@@ -343,7 +366,7 @@ class SendThread(Thread):
         self.running = False
 
 
-DESCRIPTION = 'GammaFlash DAM server emulator v1.0.0'
+DESCRIPTION = 'GammaFlash DAM server emulator v1.2.0'
 
 
 if __name__ == '__main__':
@@ -354,12 +377,29 @@ if __name__ == '__main__':
 
     # Configure input arguments
     parser = argparse.ArgumentParser(prog='gfse', description=DESCRIPTION)
+    parser.add_argument('--addr', type=str, help='The Redpitaya IP address', required=True)
     parser.add_argument('--port', type=int, help='Server port', required=True)
     parser.add_argument('--indir', type=str, help='Input directory', required=True)
-    parser.add_argument('--id', type=int, help='Redpitaya id', required=True)
+    parser.add_argument('--rpid', type=int, help='Redpitaya id', required=False)
+    parser.add_argument('--wform-sec', type=float, help='Number of waveform per second', required=False, default=10.0)
+    parser.add_argument('--hk-sec', type=float, help='Number of hk per second', required=False, default=0.2)
+    parser.add_argument('--pkt-delay-sec', type=float, help='Delay between packets in seconds', required=False, default=0.00001)
 
     # Parse arguments and stop in case of help
     args = parser.parse_args(sys.argv[1:])
+
+    print(args)
+
+    wform_dt = 1/args.wform_sec
+
+    print("INFO: Main: Waveform x sec %f (%f s)" % (args.wform_sec, wform_dt))
+
+    hk_dt = 1/args.hk_sec
+    hk_rel_no = round(hk_dt / wform_dt)
+
+    print("INFO: Main: HK x sec %f (%f s, %d wform period)" % (args.hk_sec, hk_dt, hk_rel_no))
+
+    print("INFO: Main: Packet delay %f s" % args.pkt_delay_sec)
 
     print(DESCRIPTION)
 
@@ -376,7 +416,7 @@ if __name__ == '__main__':
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     # Bind the socket to the port
-    server_address = ('localhost', int(args.port))
+    server_address = (args.addr, int(args.port))
     sock.bind(server_address)
 
     # This should be a timeout on both accept and recv
@@ -414,7 +454,7 @@ if __name__ == '__main__':
                 if data:
                     if data[13] == 0x04:
                         print("INFO: Main: Start acquisition")
-                        send_thread = SendThread(connection, crc_table, args.indir)
+                        send_thread = SendThread(connection, crc_table, args.indir, args.rpid, wform_dt, hk_rel_no, args.pkt_delay_sec)
                         send_thread.start()
                     elif data[13] == 0x05:
                         print("INFO: Main: Stop acquisition")

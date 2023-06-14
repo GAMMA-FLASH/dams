@@ -11,8 +11,19 @@ from time import sleep
 import tables as tb
 import numpy as np
 
-from waveform import Waveform, hex_to_str
+from waveform import Waveform
 from crc32 import crc32_fill_table, crc32
+
+# ------------------------------------------------------------------ #
+# Load influx DB modules                                             #
+# ------------------------------------------------------------------ #
+HAS_INFLUX_DB = False
+try:
+    from influxdb_client import InfluxDBClient, Point, WriteOptions,WritePrecision
+    from influxdb_client.client.write_api import SYNCHRONOUS
+    HAS_INFLUX_DB = True
+except ImportError:
+    pass
 
 
 class Event:
@@ -180,17 +191,40 @@ class RecvThread(Thread):
 
 class SaveThread(Thread):
 
-    def __init__(self, queue, id, outdir, wformno):
+    def __init__(self, queue, outdir, wformno):
         Thread.__init__(self)
         self.queue = queue
-        self.id = id
         self.outdir = outdir
         self.wformno = wformno
         self.event_list = []
+        self.save_event = False
         self.hk_list = []
+        self.save_hk = True
         self.wform_list = []
         self.wform_count = 0
         self.running = True
+
+        # ------------------------------------------------------------------ #
+        # Setup influx DB                                                    #
+        # ------------------------------------------------------------------ #
+
+        if HAS_INFLUX_DB:
+
+            url = "172.17.0.2:8086"
+            token = "uQmtmZMYQb-iiyB66CuO91eDUemEc2-l-eWza8hq6ehKoM4TVNj_Y0vIGKgrDUYi4XX9qQXEiPD5kNTYRK_ITQ=="
+            org = "GAMMA-FLASH"
+            bucket = "RP-DATA"
+
+            self.client = InfluxDBClient(url=url, token=token, org=self.org)
+            self.write_api = self.client.write_api(write_options=SYNCHRONOUS)
+            self.bucket = bucket
+            self.org = org
+
+        else:
+            self.client = None
+            self.write_api = None
+            self.bucket = None
+            self.org = None
 
     def run(self):
 
@@ -217,14 +251,22 @@ class SaveThread(Thread):
             self.queue.task_done()
 
             if type(packet) is Event:
-                # print('Save event')
+                #print('Save event')
                 self.event_list.append(packet)
             elif type(packet) is Hk:
-                # print('Save HK')
+                #print('Save HK')
                 self.hk_list.append(packet)
             else:
 
-                # print('Save wform')
+                # ------------------------------------------------------------------ #
+                # Send data to influx DB                                             #
+                # ------------------------------------------------------------------ #
+
+                if HAS_INFLUX_DB:
+                    time_ms = math.trunc(wform.tstart * 1000)
+                    self.write_api.write(self.bucket, self.org, Point("RPG%1d" % wform.rpID).field("count", 1).time(time_ms, WritePrecision.MS))
+
+                #print('Save wform')
                 self.wform_list.append(packet)
                 self.wform_count += 1
 
@@ -240,31 +282,25 @@ class SaveThread(Thread):
 
                     # Create the file name using the rx time of the first waveform
                     wf0 = self.wform_list[0]
-
-                    # Year/month/day/hour/min/sec
-                    time_str1 = time.strftime("%Y-%m-%dT%H_%M_%S", time.gmtime(wf0.trx))
-
-                    # Microsecs
+                    ts = time.gmtime(wf0.trx)
+                    str1 = time.strftime("%Y-%m-%dT%H_%M_%S", ts)
                     sns = math.modf(wf0.trx)
                     usec = round(sns[0] * 1e6)
-                    time_str2 = '%06d' % usec
+                    str2 = '%06d' % usec
+                    fname = '%s/wf_runId_%s_configId_%s_%s.%s' % (self.outdir, str(wf0.runID).zfill(5), str(wf0.configID).zfill(5), str1, str2)
 
-                    # Full file name with path
-                    fname = '%s/wf_runId_%s_configId_%s_%s.%s.h5' % (
-                    self.outdir, str(wf0.runID).zfill(5), str(wf0.configID).zfill(5), time_str1, time_str2)
+                    print('Open file: ' + fname + '.h5')
 
-                    print('Open file: ' + fname)
+                    h5_out = tb.open_file(fname + '.h5', mode='w', title='dl0')
 
-                    h5_out = tb.open_file(fname, mode='w', title='dl0')
-
-                    group = h5_out.create_group('/', 'waveforms', 'waveforms data')
+                    wform_group = h5_out.create_group('/', 'waveforms', 'waveform information')
 
                     atom = tb.Int16Atom()
                     shape = (16384, 1)
                     filters = tb.Filters(complevel=5, complib='zlib')
 
                     for i, wf in enumerate(self.wform_list):
-                        arr = h5_out.create_carray(group, 'wf_%s' % str(i).zfill(6), atom, shape, f'wf{i}', filters=filters)
+                        arr = h5_out.create_carray(wform_group, 'wf_%s' % str(i).zfill(6), atom, shape, f'wf{i}', filters=filters)
                         arr._v_attrs.VERSION = '2.0'
                         arr._v_attrs.rp_id = wf.rpID
                         arr._v_attrs.runid = wf.runID
@@ -286,23 +322,27 @@ class SaveThread(Thread):
                         arr._v_attrs.SampleNo = wf.sample_no
                         arr._v_attrs.tstart = wf.tstart
                         arr._v_attrs.tend = wf.tstop
-
                         arr[:16384] = np.transpose(np.array([wf.sigr.astype(np.int16)*-1]))[:16384]
 
-                    group = h5_out.create_group('/', 'hk', 'waveforms data')
+                    if self.save_hk:
 
-                    shape = (1, 1)
-                    for i, hk in enumerate(self.hk_list):
-                        arr = h5_out.create_carray(group, 'hk_%s' % str(i).zfill(6), atom, shape, f'hk{i}', filters=filters)
-                        arr._v_attrs.state = hk.state
-                        arr._v_attrs.flags = hk.flags
-                        arr._v_attrs.wform_count = hk.wform_count
+                        hk_group = h5_out.create_group('/', 'hk', 'hk information')
 
-                        arr[:] = 0
+                        shape = (1, 1)
+                        for i, hk in enumerate(self.hk_list):
+                            arr = h5_out.create_carray(hk_group, 'hk_%s' % str(i).zfill(6), atom, shape, f'hk{i}', filters=filters)
+                            arr._v_attrs.state = hk.state
+                            arr._v_attrs.flags = hk.flags
+                            arr._v_attrs.wform_count = hk.wform_count
+                            arr[:] = 0
 
                     h5_out.close()
 
                     print('Close file')
+
+                    # Create the OK file
+                    ok_out = open(fname + '.h5.ok', 'w')
+                    ok_out.close()
 
                     self.event_list = []
                     self.hk_list = []
@@ -348,7 +388,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='gfcl', description=DESCRIPTION)
     parser.add_argument('--addr', type=str, help='The Redpitaya IP address', required=True)
     parser.add_argument('--port', type=int, help='The Redpitaya port', required=True)
-    parser.add_argument('--id', type=int, help='The Redpitaya id', required=True)
     parser.add_argument('--outdir', type=str, help='Output Directory', required=True)
     parser.add_argument('--wformno', type=int, help='Waveforms contained in HDF5 file', required=True)
 
@@ -356,6 +395,9 @@ if __name__ == '__main__':
     args = parser.parse_args(sys.argv[1:])
 
     print(DESCRIPTION)
+
+    if not HAS_INFLUX_DB:
+        print("INFO: Main: No influx DB module found")
 
     # ----------------------------------
     # Open socket
@@ -379,7 +421,7 @@ if __name__ == '__main__':
 
     queue = Queue()
 
-    save_thread = SaveThread(queue, args.id, args.outdir, args.wformno)
+    save_thread = SaveThread(queue, args.outdir, args.wformno)
     save_thread.start()
 
     sleep(1)

@@ -1,6 +1,5 @@
 import struct
 import time
-import math
 import numpy as np
 
 # RedPitaya ADC is 14 bit, raw samples are returned in 2's complement
@@ -21,7 +20,6 @@ import numpy as np
 # 0x3FFD =  16381 = -3
 # 0x3FFE =  16382 = -2
 # 0x3FFF =  16383 = -1
-
 
 def twos_comp_to_int(val, bits):
     if (val & (1 << (bits - 1))) != 0: # if sign bit is set e.g., 8bit: 128-255
@@ -89,11 +87,13 @@ class Waveform:
         self.sige = None
 
     def __str__(self):
-        time_str1 = time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime(self.trx))
-        sns = math.modf(self.trx)
+        ts = time.gmtime(self.trx)
+        str1 = time.strftime("%Y-%m-%dT%H_%M_%S", ts)
+        sns = math.modf(tm)
         usec = round(sns[0] * 1e6)
-        time_str2 = '%06d' % usec
-        return 'WF %s.%s [%4d,%4d,%4d,%4d] %12d %9d' % (time_str1, time_str2,  self.rpID, self.runID, self.sessionID, self.configID, self.tstmp[0], self.tstmp[1])
+        str2 = '%06d' % usec
+        return str1 + '.' + str2
+
 
     def load_header(self, fname):
         with open(fname, "rb") as f:
@@ -225,7 +225,7 @@ class Waveform:
 
         self.compute_time()
 
-    def read_data(self, raw, compute_signal=True):
+    def read_data(self, raw):
 
         #print("Sample to read %8d" % self.sample_to_read)
 
@@ -237,8 +237,7 @@ class Waveform:
 
         self.sample_to_read -= n
         if self.sample_to_read == 0:
-            if compute_signal: # This is not needed to produce DL0
-                self.compute_sig()
+            self.compute_sig() # This is not needed to produce DL0
             return True
         else:
             return False
@@ -308,15 +307,13 @@ class Waveform:
         print("Trigger off.: %22d" % self.trig_off)
         print("  Sample no.: %22d" % self.sample_no)
 
-'''
-
-import matplotlib.pyplot as plt
-from matplotlib import rcParams
-
 
 if __name__ == "__main__":
 
     print("Load GF binary data")
+    
+    import matplotlib.pyplot as plt
+    from matplotlib import rcParams
 
     wform = Waveform()
     wform.load(fname)
@@ -358,5 +355,3 @@ if __name__ == "__main__":
     #plt.savefig("test.png")
 
     plt.show()
-    
-'''
