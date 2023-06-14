@@ -10,6 +10,7 @@ from queue import Queue, Full, Empty
 from time import sleep
 import tables as tb
 import numpy as np
+import configparser
 
 from waveform import Waveform
 from crc32 import crc32_fill_table, crc32
@@ -24,6 +25,14 @@ try:
     HAS_INFLUX_DB = True
 except ImportError:
     pass
+
+# ------------------------------------------------------------------ #
+# Global variables                                                   #
+# ------------------------------------------------------------------ #
+INFLUX_DB_URL = None
+INFLUX_DB_TOKEN = None
+INFLUX_DB_ORG = None
+INFLUX_DB_BUCKET = None
 
 
 class Event:
@@ -210,15 +219,15 @@ class SaveThread(Thread):
 
         if HAS_INFLUX_DB:
 
-            url = "172.17.0.2:8086"
-            token = "uQmtmZMYQb-iiyB66CuO91eDUemEc2-l-eWza8hq6ehKoM4TVNj_Y0vIGKgrDUYi4XX9qQXEiPD5kNTYRK_ITQ=="
-            org = "GAMMA-FLASH"
-            bucket = "RP-DATA"
+            #url = "172.17.0.2:8086"
+            #token = "uQmtmZMYQb-iiyB66CuO91eDUemEc2-l-eWza8hq6ehKoM4TVNj_Y0vIGKgrDUYi4XX9qQXEiPD5kNTYRK_ITQ=="
+            #org = "GAMMA-FLASH"
+            #bucket = "RP-DATA"
 
-            self.client = InfluxDBClient(url=url, token=token, org=self.org)
+            self.client = InfluxDBClient(url=INFLUX_DB_URL, token=INFLUX_DB_TOKEN, org=INFLUX_DB_ORG)
             self.write_api = self.client.write_api(write_options=SYNCHRONOUS)
-            self.bucket = bucket
-            self.org = org
+            self.bucket = INFLUX_DB_BUCKET
+            self.org = INFLUX_DB_ORG
 
         else:
             self.client = None
@@ -263,8 +272,8 @@ class SaveThread(Thread):
                 # ------------------------------------------------------------------ #
 
                 if HAS_INFLUX_DB:
-                    time_ms = math.trunc(wform.tstart * 1000)
-                    self.write_api.write(self.bucket, self.org, Point("RPG%1d" % wform.rpID).field("count", 1).time(time_ms, WritePrecision.MS))
+                    time_ms = math.trunc(packet.tstart * 1000)
+                    self.write_api.write(self.bucket, self.org, Point("RPG%1d" % packet.rpID).field("count", 1).time(time_ms, WritePrecision.MS))
 
                 #print('Save wform')
                 self.wform_list.append(packet)
@@ -375,7 +384,7 @@ def start_acqusition(sock, crc_table):
     sock.send(header + data)
 
 
-DESCRIPTION = 'GammaFlash client v2.0.0'
+DESCRIPTION = 'GammaFlash client v2.0.1'
 
 
 if __name__ == '__main__':
@@ -398,6 +407,21 @@ if __name__ == '__main__':
 
     if not HAS_INFLUX_DB:
         print("INFO: Main: No influx DB module found")
+
+    # ----------------------------------
+    # Load configuration
+    # ----------------------------------
+    cfg = configparser.ConfigParser()
+    cfg.read('gfcl.ini')
+    if HAS_INFLUX_DB:
+        if cfg['INFLUXDB'].getboolean('Enable'):
+            print("INFO: Main: load influx DB connection pramaters")
+            INFLUX_DB_URL = cfg['INFLUXDB'].get("URL")
+            INFLUX_DB_TOKEN = cfg['INFLUXDB'].get("Token")
+            INFLUX_DB_ORG = cfg['INFLUXDB'].get("Org")
+            INFLUX_DB_BUCKET = cfg['INFLUXDB'].get("Bucket")
+        else:
+            HAS_INFLUX_DB = False
 
     # ----------------------------------
     # Open socket
