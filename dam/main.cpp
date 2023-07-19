@@ -127,8 +127,9 @@ int main(int argc, const char * argv[]) {
             case SIGUSR1:
             	g_waveAcq.destroy();
             	{
-            		uint32_t totAcqWformCount = g_systemInfo.totAcqWformCount;
-            		TRACE("Stop wform acquisition: acq. %8d sent %8d saved %8d\n", totAcqWformCount, g_systemInfo.sentWformCount, g_systemInfo.savedWformCount);
+            		//uint32_t totAcqWformCount = g_systemInfo.totAcqWformCount;
+            		//TRACE("Stop wform acquisition: acq. %8d sent %8d saved %8d\n", totAcqWformCount, g_systemInfo.sentWformCount, g_systemInfo.savedWformCount);
+			TRACE("Stop wform acquisition\n");
             	}
             	
             	break;

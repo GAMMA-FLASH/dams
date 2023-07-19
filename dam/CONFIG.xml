@@ -1,4 +1,4 @@
 <?xml version="1.0"?>
 <DAM version="02.04.0000" apid="01" damSessionID="00" configID="00" />
-<Configuration monitorPeriodSecs="0005" sendWform="yes" saveWform="yes" saveWformNo="100" />
-<Oscilloscope eqLevel="01" decimation="0001" trigSource="02" trigThresh="000128" trigHyst="000050" trigDelay="001024" trigDebounce="000010" />
+<Configuration monitorPeriodSecs="0005" sendWform="yes" saveWform="no" saveWformNo="100" />
+<Oscilloscope eqLevel="01" decimation="0001" trigSource="03" trigThresh="15688" trigHyst="000050" trigDelay="001024" trigDebounce="000010" />
