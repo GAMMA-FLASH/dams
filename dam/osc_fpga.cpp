@@ -321,12 +321,14 @@ int osc_fpga_wait_trigger(useconds_t usec) {
 	//}
 	
 	//return 0;
-	
+	//printf("--------------------------------------\n");
 	for (int i = 0; i < 10000; i++) {
-		if (g_osc_fpga_reg_mem->trig_source) {
-			usleep(usec);
-		} else {
+		//printf("%08X %08X\n", g_osc_fpga_reg_mem->trig_source, g_osc_fpga_reg_mem->conf);
+		if (g_osc_fpga_reg_mem->conf & OSC_FPGA_CONF_DELAY_PASS) {
 			return 0;
+		} else {
+//printf("%08X %08X\n", g_osc_fpga_reg_mem->trig_source, g_osc_fpga_reg_mem->conf);
+			usleep(usec);
 		}
 	}
 			
