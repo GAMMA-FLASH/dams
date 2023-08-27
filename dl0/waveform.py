@@ -307,6 +307,16 @@ class Waveform:
         print("Trigger off.: %22d" % self.trig_off)
         print("  Sample no.: %22d" % self.sample_no)
 
+        if self.trig_off > self.curr_off:
+            pre_trig_sz = self.trig_off - self.curr_off
+            post_trig_sz = self.sample_no - pre_trig_sz
+        else:
+            post_trig_sz = self.curr_off - self.trig_off
+            pre_trig_sz = self.sample_no -  post_trig_sz
+
+        print(" Pre trig sz: %22d" % pre_trig_sz)
+        print("Post trig sz: %22d" % post_trig_sz)
+
 
 if __name__ == "__main__":
 

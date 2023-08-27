@@ -34,6 +34,14 @@ INFLUX_DB_TOKEN = None
 INFLUX_DB_ORG = None
 INFLUX_DB_BUCKET = None
 
+def trx_to_str(trx):
+    ts = time.gmtime(trx)
+    str1 = time.strftime("%Y%m%dT%H:%M:%S", ts)
+    sns = math.modf(trx)
+    usec = round(sns[0] * 1e6)
+    str2 = '%06d' % usec
+    return str1 + "." + str2
+
 
 class Event:
     def __init__(self,trx=None):
@@ -72,6 +80,32 @@ class Hk:
         self.state = struct.unpack('<B', raw[2:3])[0]
         self.flags = struct.unpack('<B', raw[3:4])[0]
         self.wform_count = struct.unpack('<I', raw[4:])[0]
+
+    def print(self):
+        #print("    State: %02X" % self.state)
+        #print("    Flags: %02X" % self.flags)
+        #print("Wform no.: %d" % self.wform_count)
+        msg = trx_to_str(self.trx) + ' '
+        if self.state == 0x02:
+            msg += 'SRV'
+        elif self.state == 0x03:
+            msg += 'ACQ'
+        else:
+            msg += 'UNK'
+        if self.flags & 0x80:
+            msg += ' P'
+        else:
+            msg += ' _'
+        if self.flags & 0x40:
+            msg += 'G'
+        else:
+            msg += '_'
+        if self.flags & 0x20:
+            msg += 'T'
+        else:
+            msg += '_'
+        msg += ' %5d' % self.wform_count
+        print(msg)
 
 
 class RecvThread(Thread):
@@ -156,7 +190,7 @@ class RecvThread(Thread):
 
     def decode_wform_header(self, header, payload):
         self.wform_seq_count = header[2] & 0x3FFF
-        self.wform = Waveform(rpID=header[1], runID=header[3])
+        self.wform = Waveform(rpID=header[1] & 0x7F, runID=header[3])
         self.wform.read_header(payload)
 
     def decode_wform_data(self, header, payload):
@@ -264,6 +298,7 @@ class SaveThread(Thread):
                 self.event_list.append(packet)
             elif type(packet) is Hk:
                 #print('Save HK')
+                packet.print()
                 self.hk_list.append(packet)
             else:
 
@@ -275,7 +310,6 @@ class SaveThread(Thread):
                     time_ms = math.trunc(packet.tstart * 1000)
                     self.write_api.write(self.bucket, self.org, Point("RPG%1d" % packet.rpID).field("count", 1).time(time_ms, WritePrecision.MS))
 
-                #print('Save wform')
                 self.wform_list.append(packet)
                 self.wform_count += 1
 
@@ -298,7 +332,7 @@ class SaveThread(Thread):
                     str2 = '%06d' % usec
                     fname = '%s/wf_runId_%s_configId_%s_%s.%s' % (self.outdir, str(wf0.runID).zfill(5), str(wf0.configID).zfill(5), str1, str2)
 
-                    print('Open file: ' + fname + '.h5')
+                    print('Save file: ' + fname + '.h5')
 
                     h5_out = tb.open_file(fname + '.h5', mode='w', title='dl0')
 
@@ -347,7 +381,7 @@ class SaveThread(Thread):
 
                     h5_out.close()
 
-                    print('Close file')
+                    #print('Close file')
 
                     # Create the OK file
                     ok_out = open(fname + '.h5.ok', 'w')
@@ -370,6 +404,11 @@ class SaveThread(Thread):
 
 def start_acqusition(sock, crc_table):
 
+    # Parameters
+    #    Source: 0 = true, 1 = syntetic
+    #  Constant: 0
+    #    WaveNo: 0 = infinite, number of wfroms to be acquired
+    # WaitUsecs: 0 = no wait, wait time before rearming in usecs 
     data = struct.pack("<BBBBII", 0xA0, 0x04, 0, 0, 0, 0)
 
     # Compute CRC
@@ -472,7 +511,7 @@ if __name__ == '__main__':
 
     while True:
         try:
-            print("INFO: Main: Running ")
+            #print("INFO: Main: Running ")
             sleep(5)
         except KeyboardInterrupt:
             break
