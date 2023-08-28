@@ -37,7 +37,7 @@ uint32_t           *g_osc_fpga_chb_mem = NULL;
 int                 g_osc_fpga_mem_fd = -1;
 
 /* @brief Number of ADC acquisition bits.  */
-const int 			g_osc_fpga_adc_bits = 14;
+const int           g_osc_fpga_adc_bits = 14;
 
 /* @brief Sampling frequency = 125Mspmpls (non-decimated). */
 const float         g_osc_fpga_smpl_freq = 125e6;
@@ -313,21 +313,14 @@ int osc_fpga_wait_trigger(useconds_t usec) {
 	}
 	
 	// The trigger source register is set before arming the trigger and it is cleared
-	// by the FPGA when the acquisition ended.
+	// by the FPGA when the acquisition start.
+	// The end of the acquisition is detected checking the OSC_FPGA_CONF_DELAY_PASS bit.
 	// After the end of the acquisition the current write position is constant.
 	
-	//while (g_osc_fpga_reg_mem->trig_source) {
-	//	usleep(usec);
-	//}
-	
-	//return 0;
-	//printf("--------------------------------------\n");
 	for (int i = 0; i < 10000; i++) {
-		//printf("%08X %08X\n", g_osc_fpga_reg_mem->trig_source, g_osc_fpga_reg_mem->conf);
 		if (g_osc_fpga_reg_mem->conf & OSC_FPGA_CONF_DELAY_PASS) {
 			return 0;
-		} else {
-//printf("%08X %08X\n", g_osc_fpga_reg_mem->trig_source, g_osc_fpga_reg_mem->conf);
+		} else }
 			usleep(usec);
 		}
 	}
