@@ -1,76 +1,42 @@
-#ifndef __TSTAMP_H__
-#define __TSTAMP_H__
+#ifndef TSTAMP_H
+#define TSTAMP_H
 
 #include <cstdint>
-#include <pthread.h>
-    
+#include <ctime> // Includi <ctime> per struct timespec
+
 class TimeStamp {
-
 public:
+    static const uint32_t TS_NOPPS = 0x01;
+    static const uint32_t TS_NOUART = 0x02;
+    static const uint32_t TS_OVFLOW = 0x04;
 
-	// APID
-    enum {
-        TS_VALID 	= 0x00,
-        TS_NOPPS 	= 0x80,
-        TS_NOUART 	= 0x40,
-        TS_OVFLOW   = 0x01
-    } TimeSts;
-    
-    // Time tag data
-	typedef union {
-    	uint8_t _p8[24];
-    	uint16_t _p16[12];
-    	uint32_t _p32[6];
-    	struct __attribute__((packed)) {
-        	struct timespec ts; 	// 1-2, 2 x 32
-    		uint32_t hh;			// 3
-    		uint32_t mm;			// 4
-    		uint32_t ss;			// 5
-    		uint32_t us;			// 6
-    	};
-	} CurrentTime;
-	
-	typedef union {
-		uint8_t _p8[44];
-        uint16_t _p16[22];
-        uint32_t _p32[11];
-		struct __attribute__((packed)) {
-    		uint16_t ppsSliceNo; // 0
-    		uint8_t year;
-    		uint8_t month;	
-    		uint8_t day;		// 1
-    		uint8_t hh;
-    		uint8_t mm;
-    		uint8_t ss;
-    		uint32_t us;		// 2
-		};
-	} AbsoluteTime;
-	
-	TimeStamp();
-	~TimeStamp();
-	
-	int init();
-	void destroy();
-	
-	uint32_t read(CurrentTime *currTime);
-	void computeAbsoluteTime(const struct timespec *ts, CurrentTime *currTime, AbsoluteTime *absTime);
-	
-	//uint32_t getAbsTime(const struct timespec *ts, TimeAbs *t);
-	//uint32_t getAbsTime(TimeInfo *raw, const struct timespec *ts, TimeAbs *t);
-	
-	/*
-	void print(const struct timespec *ts);
-	void read(const struct timespec *ts, TimeInfo *tinfo);
-	*/
-	
-protected:
-	
-private:
+    TimeStamp();
+    ~TimeStamp();
 
-	bool threadStarted;
-    pthread_t ppsAcqThreadInfo;
-    pthread_t ggaAcqThreadInfo;	
-	
+    int init();
+    void destroy();
+
+    struct CurrentTime {
+        struct timespec ts;
+        uint32_t hh;
+        uint32_t mm;
+        uint32_t ss;
+        uint32_t us;
+    };
+
+    struct AbsoluteTime {
+        uint32_t ppsSliceNo;
+        uint32_t hh;
+        uint32_t mm;
+        uint32_t ss;
+        uint32_t us;
+        uint32_t year;
+        uint32_t month;
+        uint32_t day;
+    };
+
+    uint32_t read(CurrentTime *currTime);
+    void computeAbsoluteTime(const struct timespec *ts, CurrentTime *currTime, AbsoluteTime *absTime);
 };
 
-#endif /* __TSTAMP_H__ */
+#endif

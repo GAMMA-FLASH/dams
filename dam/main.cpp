@@ -15,6 +15,8 @@
 #include <semaphore.h>
 #include <unistd.h>
 
+#include "tstamp.h"
+
 #include "config.h"
 #include "trace.h"
 
