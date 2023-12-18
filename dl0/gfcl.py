@@ -21,12 +21,15 @@ from crc32 import crc32_fill_table, crc32
 # ------------------------------------------------------------------ #
 # Load influx DB modules                                             #
 # ------------------------------------------------------------------ #
-HAS_INFLUX_DB = False
+HAS_INFLUX_DB_COUNTS = False
+HAS_INFLUX_DB_HK = False
 try:
     from influxdb_client import InfluxDBClient, Point, WriteOptions,WritePrecision
     from influxdb_client.client.write_api import SYNCHRONOUS
-    HAS_INFLUX_DB = True
+    HAS_INFLUX_DB_COUNTS = True
+    HAS_INFLUX_DB_HK = True
 except ImportError:
+    print("Influx modules not found") 
     pass
 
 # ------------------------------------------------------------------ #
@@ -116,32 +119,25 @@ class Hk:
         #print("    State: %02X" % self.state)
         #print("    Flags: %02X" % self.flags)
         #print("Wform no.: %d" % self.wform_count)
+
         time_ms = math.trunc(self.trx * 1000)
-        msg=f"RPG{self.rpId}_"
-        if self.state == 0x02:
-            msg += '[SRV]'
-        elif self.state == 0x03:
-            msg += '[ACQ]'
-        else:
-            msg += '[UNK]'
-        if self.flags & 0x80:
-            msg += '[P]'
-        else:
-            msg += '[_]'
-        if self.flags & 0x40:
-            msg += '[G]'
-        else:
-            msg += '[_]'
-        if self.flags & 0x20:
-            msg += '[T]'
-        else:
-            msg += '[_]'
-    
+        measurement_name = f"RPG{self.rpId}"
         
-        self._point = Point(msg).field("count", self.wform_count).time(time_ms, WritePrecision.MS)
+        pps = 1 if self.flags & 0x80 else 0
+        gps = 1 if self.flags & 0x40 else 0
+        err = 1 if self.flags & 0x20 else 0
+
+        self._point = (
+            Point(measurement_name)
+            .field("state", self.state)
+            .field("PPS", pps)
+            .field("GPS", gps)
+            .field("ERR", err)
+            .field("count", self.wform_count)
+            .time(time_ms, WritePrecision.MS)
+        )
         
-        write_api.write(bucket=bucket, org=org, record=self._point)
-        
+        write_api.write(bucket=bucket, org=org, record=self._point)        
 
 class RecvThread(Thread):
 
@@ -288,20 +284,28 @@ class SaveThread(Thread):
         # Setup influx DB                                                    #
         # ------------------------------------------------------------------ #
 
-        if HAS_INFLUX_DB:
-
-            self.client = InfluxDBClient(url=INFLUX_DB_URL, token=INFLUX_DB_TOKEN, org=INFLUX_DB_ORG)
-            self.write_api = self.client.write_api(write_options=WriteOptions(batch_size=100,
-                                                      flush_interval=10_000,
+        if HAS_INFLUX_DB_COUNTS or HAS_INFLUX_DB_HK :
+            self.org = INFLUX_DB_ORG
+            self.client = InfluxDBClient(url=INFLUX_DB_URL, token=INFLUX_DB_TOKEN, org=self.org)
+            if HAS_INFLUX_DB_COUNTS : 
+                self.bucket = INFLUX_DB_BUCKET
+                self.write_api = self.client.write_api(write_options=WriteOptions(batch_size=100,
+                                                      flush_interval=1_000,
                                                       jitter_interval=2_000,
                                                       retry_interval=5_000,
                                                       max_retries=5,
                                                       max_retry_delay=30_000,
                                                       exponential_base=2))
-            self.write_api_hk = self.client.write_api(write_options=SYNCHRONOUS)
-            self.bucket = INFLUX_DB_BUCKET
-            self.bucketHk = INFLUX_DB_BUCKET_HK
-            self.org = INFLUX_DB_ORG
+            else:
+                self.bucket = None
+                self.write_api = None
+
+            if HAS_INFLUX_DB_HK :
+                self.write_api_hk = self.client.write_api(write_options=SYNCHRONOUS)
+                self.bucketHk = INFLUX_DB_BUCKET_HK
+            else:
+                self.bucketHk = None
+                self.write_api_hk = None
 
         else:
             self.client = None
@@ -339,7 +343,7 @@ class SaveThread(Thread):
             elif type(packet) is Hk:
                 #print('Save HK')
                 packet.print()
-                if HAS_INFLUX_DB:
+                if HAS_INFLUX_DB_HK:
                     packet.influx(self.write_api_hk, self.bucketHk, self.org) 
                 self.hk_list.append(packet)
             else:
@@ -348,9 +352,9 @@ class SaveThread(Thread):
                 # Send data to influx DB                                             #
                 # ------------------------------------------------------------------ #
 
-                if HAS_INFLUX_DB:
-                    #time_ms = math.trunc(packet.tstart * 1000)
-                    time_ms = math.trunc(time.time() * 1000)
+                if HAS_INFLUX_DB_COUNTS:
+                    time_ms = math.trunc((packet.tstart - 3600) * 1000)
+                    # time_ms = math.trunc(time.time() * 1000)
                     rpid = packet.rpID
                     if self._point is None:
                         self._point = Point("RPG%1d" % rpid).field("count", 1).time(time_ms, WritePrecision.MS)
@@ -373,12 +377,14 @@ class SaveThread(Thread):
                 else:
                     pass
 
-            if self.wform_count % 10 == 0:
-                print(f"DEBUG - Queued packets: {self.queue.qsize()}, processed packets: {self.wform_count}")
+            # if self.wform_count % 10 == 0:
+            #     print(f"DEBUG - Queued packets: {self.queue.qsize()}, processed packets: {self.wform_count}")
             
-        if HAS_INFLUX_DB:
-            self.write_api.close()
-            self.write_api_hk.close()
+        if HAS_INFLUX_DB_COUNTS or HAS_INFLUX_DB_HK:
+            if HAS_INFLUX_DB_COUNTS :
+                self.write_api.close()
+            if HAS_INFLUX_DB_HK : 
+                self.write_api_hk.close()
             self.client.close()
         
         if self.wform_count > 0:
@@ -525,7 +531,7 @@ if __name__ == '__main__':
 
     print(DESCRIPTION)
 
-    if not HAS_INFLUX_DB:
+    if not HAS_INFLUX_DB_HK or not HAS_INFLUX_DB_COUNTS:
         print("INFO: Main: No influx DB module found")
 
     # ----------------------------------
@@ -533,16 +539,25 @@ if __name__ == '__main__':
     # ----------------------------------
     cfg = configparser.ConfigParser()
     cfg.read('gfcl.ini')
-    if HAS_INFLUX_DB:
-        if cfg['INFLUXDB'].getboolean('Enable'):
+    if HAS_INFLUX_DB_HK or HAS_INFLUX_DB_COUNTS:
+        if cfg['INFLUXDB'].getboolean('Enable_Counts') or cfg['INFLUXDB'].getboolean('Enable_Hk'):
             print("INFO: Main: load influx DB connection pramaters")
             INFLUX_DB_URL = cfg['INFLUXDB'].get("URL")
             INFLUX_DB_TOKEN = cfg['INFLUXDB'].get("Token")
             INFLUX_DB_ORG = cfg['INFLUXDB'].get("Org")
-            INFLUX_DB_BUCKET = cfg['INFLUXDB'].get("Bucket")
-            INFLUX_DB_BUCKET_HK = cfg['INFLUXDB'].get("BucketHk")
+            if cfg['INFLUXDB'].getboolean('Enable_Counts') :
+                print("Counts enabled")
+                INFLUX_DB_BUCKET = cfg['INFLUXDB'].get("Bucket")
+            else: 
+                HAS_INFLUX_DB_COUNTS = False
+            if cfg['INFLUXDB'].getboolean('Enable_Hk') :
+                print("Housekeeping enabled")
+                INFLUX_DB_BUCKET_HK = cfg['INFLUXDB'].get("BucketHk")
+            else:
+                HAS_INFLUX_DB_HK = False
         else:
-            HAS_INFLUX_DB = False
+            HAS_INFLUX_DB_HK = False
+            HAS_INFLUX_DB_COUNTS = False
     
     spectrum_cfg={
             'Enable' : cfg['SPECTRUM_AN'].getboolean('Enable'),
@@ -598,7 +613,6 @@ if __name__ == '__main__':
     # ----------------------------------
     # Monitor loop
     # ----------------------------------
-
     while True:
         try:
             #print("INFO: Main: Running ")
