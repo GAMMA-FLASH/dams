@@ -11,6 +11,10 @@ Usage:
 
 python gfse.py --addr 172.17.0.2 --port 1234 --indir /mnt/DL0 --rpid 1
 
-2. When the server is running launch the client
+2. Define a symbolic link "gfcl.ini" to a gfcl.ini.<target> 
+
+ln -s ./dl0/gfcl.ini.maincomputer ./dl0/gfcl.ini
+
+3. When the server is running launch the client
 
 python gfcl.py --addr 172.17.0.2 --port 1234  --outdir ./test --wformno 10
