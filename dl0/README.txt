@@ -1,3 +1,5 @@
+nohup python3.9 gfcl.py --addr 192.168.1.101 --port 1234 --outdir /archive/DL0c/RPG101/35mV/ --wformno 1000 &
+
 GammaFlash client/server tools.
 
 GF Client is aimed at receiving data from each DAM and save the waveforms in HDF5 format (DL0).

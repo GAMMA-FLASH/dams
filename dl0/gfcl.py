@@ -1,5 +1,6 @@
 import os
 import sys
+import subprocess
 import argparse
 import struct
 import socket
@@ -11,6 +12,8 @@ from time import sleep
 import tables as tb
 import numpy as np
 import configparser
+import gc
+from pathlib import Path
 
 from waveform import Waveform
 from crc32 import crc32_fill_table, crc32
@@ -33,6 +36,7 @@ INFLUX_DB_URL = None
 INFLUX_DB_TOKEN = None
 INFLUX_DB_ORG = None
 INFLUX_DB_BUCKET = None
+INFLUX_DB_BUCKET_HK = None
 
 def trx_to_str(trx):
     ts = time.gmtime(trx)
@@ -42,7 +46,7 @@ def trx_to_str(trx):
     str2 = '%06d' % usec
     return str1 + "." + str2
 
-
+print("gc enabled: ", gc.isenabled())
 class Event:
     def __init__(self,trx=None):
 
@@ -57,8 +61,8 @@ class Event:
 
 
 class Hk:
-    def __init__(self,trx=None):
-
+    def __init__(self, rpId=None, trx=None):
+        self.rpId = rpId
         # Receive time in secs past January 1, 1970, 00:00:00 (UTC)
         if trx is None:
             self.trx = time.time()
@@ -68,6 +72,7 @@ class Hk:
         self.state = 0
         self.flags = 0
         self.wform_count = 0
+        self._point = None
 
     def read_data(self,raw):
         # Payload structure
@@ -107,6 +112,36 @@ class Hk:
         msg += ' %5d' % self.wform_count
         print(msg)
 
+    def influx(self, write_api=None, bucket = None, org = None):
+        #print("    State: %02X" % self.state)
+        #print("    Flags: %02X" % self.flags)
+        #print("Wform no.: %d" % self.wform_count)
+        time_ms = math.trunc(self.trx * 1000)
+        msg=f"RPG{self.rpId}_"
+        if self.state == 0x02:
+            msg += '[SRV]'
+        elif self.state == 0x03:
+            msg += '[ACQ]'
+        else:
+            msg += '[UNK]'
+        if self.flags & 0x80:
+            msg += '[P]'
+        else:
+            msg += '[_]'
+        if self.flags & 0x40:
+            msg += '[G]'
+        else:
+            msg += '[_]'
+        if self.flags & 0x20:
+            msg += '[T]'
+        else:
+            msg += '[_]'
+    
+        
+        self._point = Point(msg).field("count", self.wform_count).time(time_ms, WritePrecision.MS)
+        
+        write_api.write(bucket=bucket, org=org, record=self._point)
+        
 
 class RecvThread(Thread):
 
@@ -114,6 +149,7 @@ class RecvThread(Thread):
         Thread.__init__(self)
         self.queue = queue
         self.sock = sock
+        self.rpId = sock.getpeername()[0][-1]
         self.crc_table = crc_table
         self.data = bytes()
         self.pkt_count = 0
@@ -211,7 +247,7 @@ class RecvThread(Thread):
 
     def decode_hk(self, header, payload):
         #print('Decode HK')
-        hk = Hk()
+        hk = Hk(self.rpId)
         hk.read_data(payload)
         try:
             self.queue.put(hk, timeout=5)
@@ -234,7 +270,7 @@ class RecvThread(Thread):
 
 class SaveThread(Thread):
 
-    def __init__(self, queue, outdir, wformno):
+    def __init__(self, queue, outdir, wformno, spectrum_cfg):
         Thread.__init__(self)
         self.queue = queue
         self.outdir = outdir
@@ -246,21 +282,25 @@ class SaveThread(Thread):
         self.wform_list = []
         self.wform_count = 0
         self.running = True
-
+        self._point = None
+        self.spectum_cfg = spectrum_cfg
         # ------------------------------------------------------------------ #
         # Setup influx DB                                                    #
         # ------------------------------------------------------------------ #
 
         if HAS_INFLUX_DB:
 
-            #url = "172.17.0.2:8086"
-            #token = "uQmtmZMYQb-iiyB66CuO91eDUemEc2-l-eWza8hq6ehKoM4TVNj_Y0vIGKgrDUYi4XX9qQXEiPD5kNTYRK_ITQ=="
-            #org = "GAMMA-FLASH"
-            #bucket = "RP-DATA"
-
             self.client = InfluxDBClient(url=INFLUX_DB_URL, token=INFLUX_DB_TOKEN, org=INFLUX_DB_ORG)
-            self.write_api = self.client.write_api(write_options=SYNCHRONOUS)
+            self.write_api = self.client.write_api(write_options=WriteOptions(batch_size=100,
+                                                      flush_interval=10_000,
+                                                      jitter_interval=2_000,
+                                                      retry_interval=5_000,
+                                                      max_retries=5,
+                                                      max_retry_delay=30_000,
+                                                      exponential_base=2))
+            self.write_api_hk = self.client.write_api(write_options=SYNCHRONOUS)
             self.bucket = INFLUX_DB_BUCKET
+            self.bucketHk = INFLUX_DB_BUCKET_HK
             self.org = INFLUX_DB_ORG
 
         else:
@@ -274,7 +314,7 @@ class SaveThread(Thread):
         # Create output directory (if needed)
         os.makedirs(self.outdir, exist_ok=True)
 
-        while self.running is True:
+        while self.running is True or self.queue.qsize() != 0:
 
             try:
 
@@ -289,16 +329,18 @@ class SaveThread(Thread):
                 print('ERROR: Save: something went wrong on queue get')
                 sleep(1)
                 continue
-
+            
             # Signal that the object has been retrieved
             self.queue.task_done()
-
+            
             if type(packet) is Event:
                 #print('Save event')
                 self.event_list.append(packet)
             elif type(packet) is Hk:
                 #print('Save HK')
                 packet.print()
+                if HAS_INFLUX_DB:
+                    packet.influx(self.write_api_hk, self.bucketHk, self.org) 
                 self.hk_list.append(packet)
             else:
 
@@ -307,102 +349,141 @@ class SaveThread(Thread):
                 # ------------------------------------------------------------------ #
 
                 if HAS_INFLUX_DB:
-                    time_ms = math.trunc(packet.tstart * 1000)
-                    self.write_api.write(self.bucket, self.org, Point("RPG%1d" % packet.rpID).field("count", 1).time(time_ms, WritePrecision.MS))
+                    #time_ms = math.trunc(packet.tstart * 1000)
+                    time_ms = math.trunc(time.time() * 1000)
+                    rpid = packet.rpID
+                    if self._point is None:
+                        self._point = Point("RPG%1d" % rpid).field("count", 1).time(time_ms, WritePrecision.MS)
+                    else: 
+                        self._point.time(time_ms, WritePrecision.MS)
+                    self.write_api.write(self.bucket, self.org, record=self._point)
 
                 self.wform_list.append(packet)
                 self.wform_count += 1
 
                 if self.wform_count == self.wformno:
 
-                    # Note that the time needed to write the data is a function of the number of I/O ops
-                    # hence it is more efficient keeping the data into memory list and dump the lists in
-                    # one shot
+                    filename = self.dump_packets()
+                                        
+                    if self.spectum_cfg['Enable']:
+                        self.start_spectrum_an(filename=filename)
 
-                    # print(len(self.event_list))
-                    # print(len(self.hk_list))
-                    # print(len(self.wform_list))
-
-                    # Create the file name using the rx time of the first waveform
-                    wf0 = self.wform_list[0]
-                    ts = time.gmtime(wf0.trx)
-                    str1 = time.strftime("%Y-%m-%dT%H_%M_%S", ts)
-                    sns = math.modf(wf0.trx)
-                    usec = round(sns[0] * 1e6)
-                    str2 = '%06d' % usec
-                    fname = '%s/wf_runId_%s_configId_%s_%s.%s' % (self.outdir, str(wf0.runID).zfill(5), str(wf0.configID).zfill(5), str1, str2)
-
-                    print('Save file: ' + fname + '.h5')
-
-                    h5_out = tb.open_file(fname + '.h5', mode='w', title='dl0')
-
-                    wform_group = h5_out.create_group('/', 'waveforms', 'waveform information')
-
-                    atom = tb.Int16Atom()
-                    shape = (16384, 1)
-                    filters = tb.Filters(complevel=5, complib='zlib')
-
-                    for i, wf in enumerate(self.wform_list):
-                        arr = h5_out.create_carray(wform_group, 'wf_%s' % str(i).zfill(6), atom, shape, f'wf{i}', filters=filters)
-                        arr._v_attrs.VERSION = '2.0'
-                        arr._v_attrs.rp_id = wf.rpID
-                        arr._v_attrs.runid = wf.runID
-                        arr._v_attrs.sessionID = wf.sessionID
-                        arr._v_attrs.configID = wf.configID
-                        arr._v_attrs.TimeSts = wf.timeSts
-                        arr._v_attrs.PPSSliceNO = wf.ppsSliceNo
-                        arr._v_attrs.Year = wf.year
-                        arr._v_attrs.Month = wf.month
-                        arr._v_attrs.Day = wf.day
-                        arr._v_attrs.HH = wf.hh
-                        arr._v_attrs.mm = wf.mm
-                        arr._v_attrs.ss = wf.ss
-                        arr._v_attrs.usec = wf.usec
-                        arr._v_attrs.Eql = wf.eql
-                        arr._v_attrs.Dec = wf.dec
-                        arr._v_attrs.CurrentOffset = wf.curr_off
-                        arr._v_attrs.TriggerOffset = wf.trig_off
-                        arr._v_attrs.SampleNo = wf.sample_no
-                        arr._v_attrs.tstart = wf.tstart
-                        arr._v_attrs.tend = wf.tstop
-                        arr[:16384] = np.transpose(np.array([wf.sigr.astype(np.int16)*-1]))[:16384]
-
-                    if self.save_hk:
-
-                        hk_group = h5_out.create_group('/', 'hk', 'hk information')
-
-                        shape = (1, 1)
-                        for i, hk in enumerate(self.hk_list):
-                            arr = h5_out.create_carray(hk_group, 'hk_%s' % str(i).zfill(6), atom, shape, f'hk{i}', filters=filters)
-                            arr._v_attrs.state = hk.state
-                            arr._v_attrs.flags = hk.flags
-                            arr._v_attrs.wform_count = hk.wform_count
-                            arr[:] = 0
-
-                    h5_out.close()
-
-                    #print('Close file')
-
-                    # Create the OK file
-                    ok_out = open(fname + '.h5.ok', 'w')
-                    ok_out.close()
-
-                    self.event_list = []
-                    self.hk_list = []
-                    self.wform_list = []
-
-                    self.wform_count = 0
+                    self.flush_data()
 
                 else:
                     pass
 
+            if self.wform_count % 10 == 0:
+                print(f"DEBUG - Queued packets: {self.queue.qsize()}, processed packets: {self.wform_count}")
+            
+        if HAS_INFLUX_DB:
+            self.write_api.close()
+            self.write_api_hk.close()
+            self.client.close()
+        
+        if self.wform_count > 0:
+            filename = self.dump_packets()
+                                        
+            if self.spectum_cfg['Enable']:
+                self.start_spectrum_an(filename=filename)
         print('Dump queue')
 
     def stop(self):
         self.running = False
 
+    def start_spectrum_an(self, filename):
+        inputfile = filename + '.h5'
+        output_log = Path(self.spectum_cfg['ProcessOut']).joinpath(f"{str(Path(filename).name)}.log")
+        
+        cmd=[
+            f"#!/bin/bash",
+            f"source {self.spectum_cfg['Venv']}",
+            f"{self.spectum_cfg['ProcessName']} {self.spectum_cfg['ProcessArgs']} --input {inputfile}  2&1> {output_log}"
+        ]
+        spectrum_cmd = " && ".join(cmd)
+        print("DEBUG - process command: ", spectrum_cmd)
 
-def start_acqusition(sock, crc_table):
+        subprocess.Popen(spectrum_cmd, shell=True)
+
+    def dump_packets(self) -> str:
+        # Note that the time needed to write the data is a function of the number of I/O ops
+        # hence it is more efficient keeping the data into memory list and dump the lists in
+        # one shot
+
+        # print(len(self.event_list))
+        # print(len(self.hk_list))
+        # print(len(self.wform_list))
+
+        # Create the file name using the rx time of the first waveform
+        wf0 = self.wform_list[0]
+        ts = time.gmtime(wf0.trx)
+        str1 = time.strftime("%Y-%m-%dT%H_%M_%S", ts)
+        sns = math.modf(wf0.trx)
+        usec = round(sns[0] * 1e6)
+        str2 = '%06d' % usec
+        fname = '%s/wf_runId_%s_configId_%s_%s.%s' % (self.outdir, str(wf0.runID).zfill(5), str(wf0.configID).zfill(5), str1, str2)
+
+        print('Save file: ' + fname + '.h5')
+
+        h5_out = tb.open_file(fname + '.h5', mode='w', title='dl0')
+
+        wform_group = h5_out.create_group('/', 'waveforms', 'waveform information')
+
+        atom = tb.Int16Atom()
+        shape = (16384, 1)
+        filters = tb.Filters(complevel=5, complib='zlib')
+
+        for i, wf in enumerate(self.wform_list):
+            arr = h5_out.create_carray(wform_group, 'wf_%s' % str(i).zfill(6), atom, shape, f'wf{i}', filters=filters)
+            arr._v_attrs.VERSION = '2.0'
+            arr._v_attrs.rp_id = wf.rpID
+            arr._v_attrs.runid = wf.runID
+            arr._v_attrs.sessionID = wf.sessionID
+            arr._v_attrs.configID = wf.configID
+            arr._v_attrs.TimeSts = wf.timeSts
+            arr._v_attrs.PPSSliceNO = wf.ppsSliceNo
+            arr._v_attrs.Year = wf.year
+            arr._v_attrs.Month = wf.month
+            arr._v_attrs.Day = wf.day
+            arr._v_attrs.HH = wf.hh
+            arr._v_attrs.mm = wf.mm
+            arr._v_attrs.ss = wf.ss
+            arr._v_attrs.usec = wf.usec
+            arr._v_attrs.Eql = wf.eql
+            arr._v_attrs.Dec = wf.dec
+            arr._v_attrs.CurrentOffset = wf.curr_off
+            arr._v_attrs.TriggerOffset = wf.trig_off
+            arr._v_attrs.SampleNo = wf.sample_no
+            arr._v_attrs.tstart = wf.tstart
+            arr._v_attrs.tend = wf.tstop
+            arr[:16384] = np.transpose(np.array([wf.sigr.astype(np.int16)*-1]))[:16384]
+
+        if self.save_hk:
+
+            hk_group = h5_out.create_group('/', 'hk', 'hk information')
+
+            shape = (1, 1)
+            for i, hk in enumerate(self.hk_list):
+                arr = h5_out.create_carray(hk_group, 'hk_%s' % str(i).zfill(6), atom, shape, f'hk{i}', filters=filters)
+                arr._v_attrs.state = hk.state
+                arr._v_attrs.flags = hk.flags
+                arr._v_attrs.wform_count = hk.wform_count
+                arr[:] = 0
+
+        h5_out.close()
+        # Create the OK file
+        ok_out = open(fname + '.h5.ok', 'w')
+        ok_out.close()
+
+        return fname
+    
+    def flush_data(self):
+        self.event_list = []
+        self.hk_list = []
+        self.wform_list = []
+        self.wform_count = 0
+
+def start_acquisition(sock, crc_table):
 
     # Parameters
     #    Source: 0 = true, 1 = syntetic
@@ -459,8 +540,17 @@ if __name__ == '__main__':
             INFLUX_DB_TOKEN = cfg['INFLUXDB'].get("Token")
             INFLUX_DB_ORG = cfg['INFLUXDB'].get("Org")
             INFLUX_DB_BUCKET = cfg['INFLUXDB'].get("Bucket")
+            INFLUX_DB_BUCKET_HK = cfg['INFLUXDB'].get("BucketHk")
         else:
             HAS_INFLUX_DB = False
+    
+    spectrum_cfg={
+            'Enable' : cfg['SPECTRUM_AN'].getboolean('Enable'),
+            'Venv'  : cfg['SPECTRUM_AN'].get('Venv'),
+            'ProcessName' : cfg['SPECTRUM_AN'].get('ProcessName'),
+            'ProcessArgs' : cfg['SPECTRUM_AN'].get('ProcessArgs'),
+            'Out' : cfg['SPECTRUM_AN'].get('ProcessOut')
+            }
 
     # ----------------------------------
     # Open socket
@@ -482,9 +572,9 @@ if __name__ == '__main__':
     # Start client
     # ----------------------------------
 
-    queue = Queue()
+    queue = Queue(args.wformno)
 
-    save_thread = SaveThread(queue, args.outdir, args.wformno)
+    save_thread = SaveThread(queue, args.outdir, args.wformno, spectrum_cfg)
     save_thread.start()
 
     sleep(1)
@@ -503,7 +593,7 @@ if __name__ == '__main__':
 
     print("INFO: Main: Start data acquistion")
 
-    start_acqusition(sock, crc_table)
+    start_acquisition(sock, crc_table)
 
     # ----------------------------------
     # Monitor loop
