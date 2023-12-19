@@ -280,9 +280,11 @@ class SaveThread(Thread):
         self.wform_count = 0
         self.running = True
         self._point = None
-        self.spectum_cfg = spectrum_cfg
-        self.output_path = Path(self.spectum_cfg['ProcessOut'])
-        os.makedirs(self.output_path, True)
+        self.spectrum_cfg = spectrum_cfg
+        self.output_path = None
+        if self.spectrum_cfg['Enable']:
+            self.output_path = Path(self.spectrum_cfg['ProcessOut'])
+            os.makedirs(self.output_path, True)
         # ------------------------------------------------------------------ #
         # Setup influx DB                                                    #
         # ------------------------------------------------------------------ #
@@ -372,7 +374,7 @@ class SaveThread(Thread):
 
                     filename = self.dump_packets()
                                         
-                    if self.spectum_cfg['Enable']:
+                    if self.spectrum_cfg['Enable']:
                         self.start_spectrum_an(filename=filename)
 
                     self.flush_data()
@@ -393,7 +395,7 @@ class SaveThread(Thread):
         if self.wform_count > 0:
             filename = self.dump_packets()
                                         
-            if self.spectum_cfg['Enable']:
+            if self.spectrum_cfg['Enable']:
                 self.start_spectrum_an(filename=filename)
         print('Dump queue')
 
@@ -405,8 +407,8 @@ class SaveThread(Thread):
         output_log = self.output_path.joinpath(f"{str(Path(filename).name)}.log")
         
         cmd=[
-            f"source activate {self.spectum_cfg['Venv']}",
-            f"python {self.spectum_cfg['ProcessName']} -d /home/usergamma --outdir {self.dl2_dir} {self.spectum_cfg['ProcessArgs']} --filename {inputfile} > {output_log} 2>&1"
+            f"source activate {self.spectrum_cfg['Venv']}",
+            f"python {self.spectrum_cfg['ProcessName']} -d /home/usergamma --outdir {self.dl2_dir} {self.spectrum_cfg['ProcessArgs']} --filename {inputfile} > {output_log} 2>&1"
         ]
         spectrum_cmd = " && ".join(cmd)
         #print("DEBUG - process command: ", spectrum_cmd)
