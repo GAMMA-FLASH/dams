@@ -1,0 +1,1 @@
+docker run -it -d -v /Users/bulgarelli/gammaflash/workspace/:/home/usergamma/workspace -v /Users/bulgarelli/gammaflash/archive/:/data02/   -p 8001:8001 --name gf1 gammaflash:2.0.3 /bin/bash
