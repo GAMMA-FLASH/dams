@@ -270,6 +270,7 @@ class SaveThread(Thread):
         Thread.__init__(self)
         self.queue = queue
         self.outdir = outdir
+        self.dl2_dir = self.outdir.replace("DL0","DL2")
         self.wformno = wformno
         self.event_list = []
         self.save_event = False
@@ -280,6 +281,8 @@ class SaveThread(Thread):
         self.running = True
         self._point = None
         self.spectum_cfg = spectrum_cfg
+        self.output_path = Path(self.spectum_cfg['ProcessOut'])
+        os.makedirs(self.output_path, True)
         # ------------------------------------------------------------------ #
         # Setup influx DB                                                    #
         # ------------------------------------------------------------------ #
@@ -399,16 +402,14 @@ class SaveThread(Thread):
 
     def start_spectrum_an(self, filename):
         inputfile = filename + '.h5'
-        output_path = Path(self.spectum_cfg['ProcessOut'])
-        os.makedirs(output_path, True)
-        output_log = output_path.joinpath(f"{str(Path(filename).name)}.log")
-        output_file_dir = str(Path(inputfile).parent).replace("DL0","DL2")
+        output_log = self.output_path.joinpath(f"{str(Path(filename).name)}.log")
+        
         cmd=[
             f"source activate {self.spectum_cfg['Venv']}",
-            f"python {self.spectum_cfg['ProcessName']} -d /home/usergamma --outdir {output_file_dir} {self.spectum_cfg['ProcessArgs']} --filename {inputfile} > {output_log} 2>&1"
+            f"python {self.spectum_cfg['ProcessName']} -d /home/usergamma --outdir {self.dl2_dir} {self.spectum_cfg['ProcessArgs']} --filename {inputfile} > {output_log} 2>&1"
         ]
         spectrum_cmd = " && ".join(cmd)
-        print("DEBUG - process command: ", spectrum_cmd)
+        #print("DEBUG - process command: ", spectrum_cmd)
 
         subprocess.Popen(spectrum_cmd, shell=True)
 
