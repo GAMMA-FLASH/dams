@@ -1,4 +1,4 @@
-source /opt/gflashenv/bin/activate
+# source /opt/gflashenv/bin/activate
 
 bootstrap() {
     local target_host=$1
@@ -27,4 +27,5 @@ echo "RPG6 ================"
 bootstrap 106
 #ssh -t 106 ". bootstrap.sh"
 
-cd workspace/dams/dl0
+GAMMAFLASH_DAMS_PATH=$(dirname $(dirname $(dirname "$(realpath "$0")")))
+cd $GAMMAFLASH_DAMS_PATH/dl0
