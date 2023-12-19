@@ -399,7 +399,9 @@ class SaveThread(Thread):
 
     def start_spectrum_an(self, filename):
         inputfile = filename + '.h5'
-        output_log = Path(self.spectum_cfg['ProcessOut']).joinpath(f"{str(Path(filename).name)}.log")
+        output_path = Path(self.spectum_cfg['ProcessOut'])
+        os.makedirs(output_path, True)
+        output_log = output_path.joinpath(f"{str(Path(filename).name)}.log")
         output_file_dir = str(Path(inputfile).parent).replace("DL0","DL2")
         cmd=[
             f"source activate {self.spectum_cfg['Venv']}",
