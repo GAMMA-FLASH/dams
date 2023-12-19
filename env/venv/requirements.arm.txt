@@ -1,0 +1,8 @@
+tables
+influxdb-client
+h5py
+numpy
+matplotlib
+joblib
+pandas
+seaborn
