@@ -4,7 +4,8 @@ GFCL=gfcl.py
 PIDS=gfcl.pids
 
 #change to script directory:
-cd "$(dirname "$0")"
+GAMMAFLASH_DAMS_PATH=$(dirname $(dirname $(dirname "$(realpath "$0")")))
+cd $GAMMAFLASH_DAMS_PATH/dl0
 
 # Check if ODIR is defined
 if [ -z "$ODIR" ]; then
