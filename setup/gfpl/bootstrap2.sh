@@ -1,5 +1,7 @@
 # source /opt/gflashenv/bin/activate
 
+DAMS_PATH=$(dirname $(dirname $(dirname "$(realpath "$0")")))
+
 bootstrap() {
     local target_host=$1
     current_time=$(date "+%Y-%m-%d %H:%M:%S")
@@ -27,5 +29,4 @@ echo "RPG6 ================"
 bootstrap 106
 #ssh -t 106 ". bootstrap.sh"
 
-GAMMAFLASH_DAMS_PATH=$(dirname $(dirname $(dirname "$(realpath "$0")")))
-cd $GAMMAFLASH_DAMS_PATH/dl0
+cd $DAMS_PATH/dl0
