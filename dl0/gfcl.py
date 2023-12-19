@@ -400,11 +400,10 @@ class SaveThread(Thread):
     def start_spectrum_an(self, filename):
         inputfile = filename + '.h5'
         output_log = Path(self.spectum_cfg['ProcessOut']).joinpath(f"{str(Path(filename).name)}.log")
-        
+        output_file_dir = str(Path(inputfile).parent).replace("DL0","DL2")
         cmd=[
-            f"#!/bin/bash",
-            f"source {self.spectum_cfg['Venv']}",
-            f"{self.spectum_cfg['ProcessName']} {self.spectum_cfg['ProcessArgs']} --input {inputfile}  2&1> {output_log}"
+            f"source activate {self.spectum_cfg['Venv']}",
+            f"python {self.spectum_cfg['ProcessName']} -d /home/usergamma --outdir {output_file_dir} {self.spectum_cfg['ProcessArgs']} --filename {inputfile} > {output_log} 2>&1"
         ]
         spectrum_cmd = " && ".join(cmd)
         print("DEBUG - process command: ", spectrum_cmd)
@@ -564,7 +563,7 @@ if __name__ == '__main__':
             'Venv'  : cfg['SPECTRUM_AN'].get('Venv'),
             'ProcessName' : cfg['SPECTRUM_AN'].get('ProcessName'),
             'ProcessArgs' : cfg['SPECTRUM_AN'].get('ProcessArgs'),
-            'Out' : cfg['SPECTRUM_AN'].get('ProcessOut')
+            'ProcessOut' : cfg['SPECTRUM_AN'].get('ProcessOut')
             }
 
     # ----------------------------------
