@@ -52,16 +52,3 @@ cd
 
 nohup jupyter-lab --ip="*" --port 8001 --no-browser --autoreload --NotebookApp.token='gf2023#'  --notebook-dir=/home/usergamma/workspace --allow-root > jupyterlab_start.log 2>&1 &
 
-=============
-Influxdb image
-
-docker run -d --name influxdb -p 8086:8086 -v /Users/bulgarelli/dbms/gammaflash/influxdb:/var/lib/influxdb2 influxdb
-
-You should add the userid also
-
-docker run -u 1001:1001 -d --name influxdb -p 8086:8086 -v /Users/bulgarelli/dbms/gammaflash/influxdb:/var/lib/influxdb2 influxdb
-
-Username = gammaflash
-Org = GAMMA-FLASH
-Bucket = RP-COUNTS
-BucketHk = HK 
