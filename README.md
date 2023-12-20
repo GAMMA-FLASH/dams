@@ -8,4 +8,3 @@ To run the acquisition
 python gfcl.py --rp_ip X.X.X.X --rp_port Y --rp_id Z --outdir "outdir" --nwfs 10000
 ```
 
-CIAO

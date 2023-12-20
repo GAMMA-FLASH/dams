@@ -284,7 +284,7 @@ class SaveThread(Thread):
         self.output_path = None
         if self.spectrum_cfg['Enable']:
             self.output_path = Path(self.spectrum_cfg['ProcessOut'])
-            os.makedirs(self.output_path, True)
+            os.makedirs(self.output_path, exist_ok=True)
         # ------------------------------------------------------------------ #
         # Setup influx DB                                                    #
         # ------------------------------------------------------------------ #
