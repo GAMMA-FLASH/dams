@@ -2,6 +2,7 @@ import argparse
 import os
 import tables as tb
 import numpy as np
+from tqdm import tqdm
 from scipy.signal import find_peaks
 from astropy.time import Time, TimeDelta
 
@@ -61,6 +62,7 @@ def f_copy_attrs(carray_original, carray_new):
     for name_attr in original_attrs._f_list():
         value_attr = original_attrs[name_attr]
         carray_new.attrs[name_attr] = value_attr
+    carray_new.attrs['VERSION'] = carray_original.attrs['VERSION']
 
 def reset_time(carray, start_index, end_index, n_event=0, time_sts=0):
     """
@@ -109,7 +111,7 @@ def reset_time(carray, start_index, end_index, n_event=0, time_sts=0):
         tdelta = (start_index-tstart_off) * tdt
     tstart1 = tstart + tdelta
     tend1  = tstart + (end_index-tstart_off) * tdt
-    if time_sts:
+    if time_sts == -1:
         date_time = Time(f'{year+1900}-{month:02d}-{day:02d}T{hh:02d}:{mm:02d}:{ss:02d}.{usec:06d}', format='isot', scale='utc', precision=6)
         time_delta = TimeDelta(tdelta, format='sec')
         date_time1 = date_time + time_delta
@@ -121,7 +123,7 @@ def reset_time(carray, start_index, end_index, n_event=0, time_sts=0):
 # def filter(fname, group, peaks, deltac_sx=150, deltac_dx=1000):
 # TODO: il deltac_dx va determinato dall'altezza
 def dl02dl1(group_new, h5_out, carray_original, idx_new, peaks, 
-            deltac_sx=150, deltac_dx=1000):
+            deltac_sx=450, deltac_dx=1000):
     """
     This function transform a wf of type `dl0` to a `dl1` to save memory space capturing
     only a window around each peak in the interval `[deltac_sx-peak, peak+deltac_dx]`
@@ -158,8 +160,8 @@ def dl02dl1(group_new, h5_out, carray_original, idx_new, peaks,
         new_carray._v_attrs.peak_idx    = pk_idx
         new_carray._v_attrs.original_wf = carray_original._v_name
         # Date and time reset attrs
-        new_carray._v_attrs.Year, new_carray._v_attrs.Month, new_carray._v_attrs.Day,           \
-            new_carray._v_attrs.HH, new_carray._v_attrs.mm, new_carray._v_attrs.ss,             \
+        new_carray._v_attrs.Year, new_carray._v_attrs.Month, new_carray._v_attrs.Day,             \
+            new_carray._v_attrs.HH, new_carray._v_attrs.mm, new_carray._v_attrs.ss,               \
             new_carray._v_attrs.usec, new_carray._v_attrs.tstart1, new_carray._v_attrs.tend1 =    \
             reset_time(carray_original, start_index, end_index, time_sts=carray_original._v_attrs.TimeSts)
         # Increase the new indexes of wf
@@ -183,6 +185,7 @@ def main():
     j = 0
     # Create the name of the new file of output of type dl1 
     fname_out = os.path.join(dest, os.path.basename(source).replace('.h5', '.dl1.h5'))
+    print(fname_out)
     # Open the source file in read mode
     with tb.open_file(source, mode='r') as h5_in:
         group = h5_in.get_node("/waveforms")
@@ -191,7 +194,7 @@ def main():
             # Create a new group where to save the new waveforms
             group1 = h5_out.create_group('/', 'waveforms', title='dl1')
             # Iterate over each wf_i, namely the carray_originals
-            for carray_i in group:
+            for carray_i in tqdm(group, total=group._g_getnchildren()):
                 # Extract the peaks list for each wf
                 peaks_list = get_peak_lists(carray_i)
                 # 

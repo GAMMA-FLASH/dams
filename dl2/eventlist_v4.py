@@ -257,7 +257,7 @@ class Eventlist:
                         #rows=np.where(arrcalc[:]>mmean1 + stdev1*5)[0]
                         rowsL = np.where(arrcalc[:] < mmean1)[0]
                         indexRows=np.where(rowsL >= deltav)[0]
-                        if v < 15000 or len(indexRows) > 0:
+                        if v < 15000 and len(indexRows) > 0:
                             arrSignal = arrcalc[0:rowsL[indexRows[0]]]
                         else:
                             arrSignal = arrcalc
@@ -269,7 +269,7 @@ class Eventlist:
                         #rowsMM=np.where(arrcalcMM[:]>mmean1 + stdev1*5)[0]
                         rowsLMM = np.where(arrcalcMM[:] < mmean1)[0]
                         indexRowsMM=np.where(rowsLMM >= deltav)[0]
-                        if v < 15000 or len(indexRowsMM) > 0:
+                        if v < 15000 and len(indexRowsMM) > 0:
                             arrSignalMM = arrcalcMM[0:rowsLMM[indexRowsMM[0]]]
                         else:
                             arrSignalMM = arrcalcMM
@@ -366,7 +366,7 @@ if __name__ == '__main__':
 
         if args.multiprocessing is None:
             for filename in list_dir:
-            	eventlist.process_file(filename, temperatures, args.outdir)
+                eventlist.process_file(filename, temperatures, args.outdir)
         #else:
             #with Pool(args.multiprocessing) as p:
                 #p.map(eventlist.process_file, list_dir)
