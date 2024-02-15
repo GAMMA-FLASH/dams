@@ -62,7 +62,7 @@ def f_copy_attrs(carray_original, carray_new):
     for name_attr in original_attrs._f_list():
         value_attr = original_attrs[name_attr]
         carray_new.attrs[name_attr] = value_attr
-    carray_new.attrs['VERSION'] = carray_original.attrs['VERSION']
+    carray_new.attrs['VERSION'] = f"3.{carray_original.attrs['VERSION']}"
 
 def reset_time(carray, start_index, end_index, n_event=0, time_sts=0):
     """
@@ -151,6 +151,13 @@ def dl02dl1(group_new, h5_out, carray_original, idx_new, peaks,
         # compl2_carray = np.transpose(np.array([window_array_np]))
         # Creiamo un nuovo CArray con gli indici filtrati
         new_carray = h5_out.create_carray(group_new, carray_name, atom, shape, f'wf{idx_new}', filters=filters, obj=compl2_carray)
+        # Compute mean and std
+        if carray_original._v_attrs.VERSION == "1.1":
+            shape_data = 1
+        elif carray_original._v_attrs.VERSION == "2.0":
+            shape_data = 0
+        mmean1 = carray_original[:100,shape_data].mean()
+        stdev1 = carray_original[:100,shape_data].std()
         # Copy the old attributes
         f_copy_attrs(carray_original, new_carray)
         # Add new attributes
@@ -159,6 +166,8 @@ def dl02dl1(group_new, h5_out, carray_original, idx_new, peaks,
         new_carray._v_attrs.peak_pos    = pk
         new_carray._v_attrs.peak_idx    = pk_idx
         new_carray._v_attrs.original_wf = carray_original._v_name
+        new_carray._v_attrs.mean1       = mmean1
+        new_carray._v_attrs.stdev1      = stdev1
         # Date and time reset attrs
         new_carray._v_attrs.Year, new_carray._v_attrs.Month, new_carray._v_attrs.Day,             \
             new_carray._v_attrs.HH, new_carray._v_attrs.mm, new_carray._v_attrs.ss,               \
