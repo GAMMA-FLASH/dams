@@ -5,7 +5,7 @@ import numpy as np
 from tqdm import tqdm
 from scipy.signal import find_peaks
 from astropy.time import Time, TimeDelta
-
+from dl02dl1_config import *
 
 def moving_average(x, w):
     """
@@ -16,11 +16,14 @@ def moving_average(x, w):
     """
     return np.convolve(x, np.ones(w), 'valid') / w
 
-def get_peak_lists(carray_i, deltav=20, thr_heur=80):
+def get_peak_lists(carray_i, mmean1,
+                   deltav=deltav, thr_heur=thr_heur, thr_end_wf=thr_end_wf):
     """
-    This function returns the list of peaks found in each waveform.
+    This function returns the list of peaks found in each waveform and a flag `F_double` 
+    which will be 1 if there are multiple peaks for the same event and 0 otherwise.
     ### Args
     * `carray_i`: The wf
+    * `mmean1`: mean of first 100 samples of background of carray_original
     * `deltav`: Define the width of range around peaks
     * `thr_heur`: threshold below which a peak is discarded, it is set as default to 80 and 
                   ithas been chosen with heuristics on data
@@ -43,10 +46,25 @@ def get_peak_lists(carray_i, deltav=20, thr_heur=80):
         #  
         ind = np.where(arrcalcMM[:] > thr_heur)
         # Remove peaks too small or peaks too close to the end of the wf
-        if len(ind[0]) == 0 or v > 16000:
+        if len(ind[0]) == 0 or v > thr_end_wf:
         # If  v > 16000:
             peaks = peaks[peaks != v]
-    return peaks
+    # Flag for multiple peaks for the same event
+    F_double = 0
+    # Check of multiple events 
+    if len(peaks) > 1:
+        peaks2 = np.copy(peaks)
+        for v, v1 in zip(peaks2, peaks2[1:]):
+            arrcalc = arr[v-deltav:]
+            arrcalc_blocks = np.lib.stride_tricks.sliding_window_view(arrcalc, blocks_size)
+            meanblock = arrcalc_blocks.mean(axis=1)
+            rowsL = np.where(meanblock <= mmean1)[0]
+            if len(rowsL) > 0:
+                firts_bkgblock_idx = rowsL[0] + v - deltav
+                if firts_bkgblock_idx > v1:
+                    peaks = peaks[peaks != v1]
+                    F_double = 1
+    return peaks, F_double
 
 def f_copy_attrs(carray_original, carray_new):
     """
@@ -120,10 +138,21 @@ def reset_time(carray, start_index, end_index, n_event=0, time_sts=0):
         year1, month1, day1, hh1, mm1, ss1, usec1 = year, month, day, hh, mm, ss, usec
     return year1, month1, day1, hh1, mm1, ss1, usec1, tstart1, tend1
 
-# def filter(fname, group, peaks, deltac_sx=150, deltac_dx=1000):
-# TODO: il deltac_dx va determinato dall'altezza
-def dl02dl1(group_new, h5_out, carray_original, idx_new, peaks, 
-            deltac_sx=450, deltac_dx=1000):
+def get_endindex(carray_original, v, mmean1, stdev1, 
+                 deltav=deltav, blocks_size=blocks_size, default_endindex=default_endindex):
+    arr = carray_original[:, -1]
+    arrcalc = arr[v-deltav:]
+    arrcalc_blocks = np.lib.stride_tricks.sliding_window_view(arrcalc, blocks_size)
+    meanblock = arrcalc_blocks.mean(axis=1)
+    rowsL = np.where(meanblock <= mmean1)[0]
+    if len(rowsL) > 0:
+        end_index = rowsL[0] + v - deltav + 100
+    else:
+        end_index = default_endindex
+    return end_index
+
+def dl02dl1(group_new, h5_out, carray_original, mmean1, stdev1, idx_new,
+            deltac_sx=deltac_sx, deltac_dx=deltac_sx):
     """
     This function transform a wf of type `dl0` to a `dl1` to save memory space capturing
     only a window around each peak in the interval `[deltac_sx-peak, peak+deltac_dx]`
@@ -131,19 +160,23 @@ def dl02dl1(group_new, h5_out, carray_original, idx_new, peaks,
     * `group_new`: the group of h5 file out
     * `h5_out`: the h5 file out to save 
     * `carray_original`: the original carray saving the original wf
+    * `mmean1`: mean of first 100 samples of background of carray_original
+    * `stdev1`: stdev of first 100 samples of background of carray_original
     * `idx_new`: new wf idx to save its name 
-    * `peaks`: peaks list 
     * `deltac_sx`: left range of the window around the peak
     * `deltac_dx`: right range of the window around the peak
     """
     atom = tb.Int16Atom()
     filters = tb.Filters(complevel=5, complib='zlib')
+    # Extract the peaks list and the flag for multiple events
+    peaks, isdouble = get_peak_lists(carray_original, mmean1)
     # Iterate over each peaks list for each wf_i
     for pk_idx, pk in enumerate(peaks):
         carray_name = 'wf_%s' % str(idx_new).zfill(6)
         # Calculate the indices to maintain
         start_index = max(pk - deltac_sx, 0)
         end_index = min(pk + deltac_dx, len(carray_original))
+        end_index = get_endindex(carray_original, pk, mmean1, stdev1, default_endindex=end_index)
         compl2_carray = carray_original.read()[start_index:end_index]
         shape = (len(compl2_carray), 1)
         # window_array = carray_original.read()[start_index:end_index, -1]
@@ -151,13 +184,6 @@ def dl02dl1(group_new, h5_out, carray_original, idx_new, peaks,
         # compl2_carray = np.transpose(np.array([window_array_np]))
         # Creiamo un nuovo CArray con gli indici filtrati
         new_carray = h5_out.create_carray(group_new, carray_name, atom, shape, f'wf{idx_new}', filters=filters, obj=compl2_carray)
-        # Compute mean and std
-        if carray_original._v_attrs.VERSION == "1.1":
-            shape_data = 1
-        elif carray_original._v_attrs.VERSION == "2.0":
-            shape_data = 0
-        mmean1 = carray_original[:100,shape_data].mean()
-        stdev1 = carray_original[:100,shape_data].std()
         # Copy the old attributes
         f_copy_attrs(carray_original, new_carray)
         # Add new attributes
@@ -166,12 +192,13 @@ def dl02dl1(group_new, h5_out, carray_original, idx_new, peaks,
         new_carray._v_attrs.peak_pos    = pk
         new_carray._v_attrs.peak_idx    = pk_idx
         new_carray._v_attrs.original_wf = carray_original._v_name
-        new_carray._v_attrs.mean1       = mmean1
+        new_carray._v_attrs.mmean1      = mmean1
         new_carray._v_attrs.stdev1      = stdev1
+        new_carray._v_attrs.isdouble    = isdouble
         # Date and time reset attrs
-        new_carray._v_attrs.Year, new_carray._v_attrs.Month, new_carray._v_attrs.Day,             \
-            new_carray._v_attrs.HH, new_carray._v_attrs.mm, new_carray._v_attrs.ss,               \
-            new_carray._v_attrs.usec, new_carray._v_attrs.tstart1, new_carray._v_attrs.tend1 =    \
+        new_carray._v_attrs.Year, new_carray._v_attrs.Month, new_carray._v_attrs.Day,                       \
+            new_carray._v_attrs.HH, new_carray._v_attrs.mm, new_carray._v_attrs.ss,                         \
+            new_carray._v_attrs.usec, new_carray._v_attrs.tstart1, new_carray._v_attrs.tend1 =              \
             reset_time(carray_original, start_index, end_index, time_sts=carray_original._v_attrs.TimeSts)
         # Increase the new indexes of wf
         idx_new += 1
@@ -203,11 +230,16 @@ def main():
             # Create a new group where to save the new waveforms
             group1 = h5_out.create_group('/', 'waveforms', title='dl1')
             # Iterate over each wf_i, namely the carray_originals
-            for carray_i in tqdm(group, total=group._g_getnchildren()):
-                # Extract the peaks list for each wf
-                peaks_list = get_peak_lists(carray_i)
+            for carray_original_i in tqdm(group, total=group._g_getnchildren()):
+                # Compute mean and std
+                if carray_original_i._v_attrs.VERSION == "1.1":
+                    shape_data = 1
+                elif carray_original_i._v_attrs.VERSION == "2.0":
+                    shape_data = 0
+                mmean1 = carray_original_i[:100,shape_data].mean()
+                stdev1 = carray_original_i[:100,shape_data].std()
                 # 
-                j = dl02dl1(group1, h5_out, carray_i, j, peaks_list)
+                j = dl02dl1(group1, h5_out, carray_original_i, mmean1, stdev1, j)
 
 if __name__ == "__main__":
     main()
