@@ -7,6 +7,7 @@ import pandas as pd
 from time import time
 from tables import *
 from pathlib import Path
+import traceback
 import matplotlib.pyplot as plt
 import matplotlib.pyplot as plt
 from multiprocessing import Pool
@@ -168,16 +169,16 @@ class Eventlist:
             #print(attrs)
             #tstarts.append(tstart)
             if shape_data < 0:
-                if data._v_attrs.VERSION == "1.1":
+                if data._v_attrs.VERSION == "1.1" or data._v_attrs.VERSION == "3.1.1":
                     shape_data = 1
-                elif data._v_attrs.VERSION == "2.0":
+                elif data._v_attrs.VERSION == "2.0" or data._v_attrs.VERSION == "3.2.0":
                     shape_data = 0
-                lenwf = len(data[:,shape_data])
+            lenwf = len(data[:,shape_data])
 
             tstart = data._v_attrs.tstart
 
             val = np.max(data[:,shape_data])
-            if val > 8192:       
+            if val > 8192:
                 y = np.array(data[:,shape_data].shape)     
                 for i, val in enumerate(data[:,shape_data]):
                     y[i] = Eventlist.twos_comp_to_int(val)
@@ -187,47 +188,57 @@ class Eventlist:
             arr = y
             arrmov = self.moving_average(arr, 15)
 
-            arr3 = arr[:100]
-            mmean1 = arr3.mean()
-            stdev1 = arr3.std()
-            mmean2 = mmean1 * 2 * 0.9 
+            if data._v_attrs.VERSION == "3.1.1" or data._v_attrs.VERSION == "3.2.0":
+                if log == True:
+                    print("recupero mean value and stdev")
+                mmean1 = data._v_attrs.mmean1
+                stdev1 = data._v_attrs.stdev1
+                if not data._v_attrs.isdouble:
+                    peaks  = [data._v_attrs.peak_pos - data._v_attrs.wf_start]
+                    print(f"Waveform num. {i} ##############################")
+                    print(f"la waveform num. {i} ha il seguente peak: {peaks} (in dl0 {data._v_attrs.peak_pos}) e mean value {mmean1} and stdev {stdev1}")
+                else:
+                    peaks, _ = find_peaks(arrmov, height=mmean1 * 2 * 0.9, width=15, distance=25)
+                    if log == True:
+                        print(f"Waveform num. {i} ##############################")
+                        print(f"la waveform num. {i} ha i seguenti peaks: {[v + data._v_attrs.wf_start for v in peaks]} "
+                              f"e mean value {mmean1} and stdev {stdev1}")    
+            else:
+                arr3 = arr[:100]
+                mmean1 = arr3.mean()
+                stdev1 = arr3.std()
+                mmean2 = mmean1 * 2 * 0.9 
+                peaks, _ = find_peaks(arrmov, height=mmean2, width=15, distance=25)
+                if log == True:
+                    print(f"Waveform num. {i} ##############################")
+                    print(f"la waveform num. {i} ha i seguenti peaks: {peaks} e mean value {mmean1} and stdev {stdev1}")
+            deltav = 20
 
-            peaks, values = find_peaks(arrmov , height=mmean2, width=15, distance=25)
-
-            if log == True:
-                print(f"Waveform num. {i} ##############################")
-                print(f"la waveform num. {i} ha i seguenti peaks: {peaks} e mean value {mmean1} and stdev {stdev1}")
                 #Print the original waveform
                 #plt.figure()
                 #plt.plot(range(len(arr)),arr, color='g')
                 #plt.plot(range(len(arrmov)),arrmov)
-            
-            deltav = 20
-        
-            peaks2 = np.copy(peaks)
-            #filtraggio picchi
-            for v in peaks2:
-                arrcalcMM = arrmov[v] - arrmov[v-deltav:v+deltav]
-                #80 has been chosen with heuristics on data 
-                ind = np.where(arrcalcMM[:] > 80)
-                #remove peaks too small or peaks too close to the end of the wf
-                if len(ind[0]) == 0 or v > 16000:
-                #if  v > 16000:
-                    if log == True:
-                        print("delete peak")
-                        print(peaks)
-                        plt.figure()
-                        plt.plot(range(len(arr)),arr, color='g')
-                        plt.plot(range(len(arrmov)),arrmov)
-    
-                        for v in peaks:
-                            plt.axvline(x = v, color = 'r') 
 
-                        plt.show()
-                        
-                    peaks = peaks[peaks != v]
-                        
-                        
+            if data._v_attrs.VERSION == "1.1" or data._v_attrs.VERSION == "2.0":
+                peaks2 = np.copy(peaks)
+                #filtraggio picchi
+                for v in peaks2:
+                    arrcalcMM = arrmov[v] - arrmov[v-deltav:v+deltav]
+                    #80 has been chosen with heuristics on data 
+                    ind = np.where(arrcalcMM[:] > 80)
+                    #remove peaks too small or peaks too close to the end of the wf
+                    if len(ind[0]) == 0 or v > 16000:
+                    #if  v > 16000:
+                        if log == True:
+                            print("delete peak")
+                            print(peaks)
+                            plt.figure()
+                            plt.plot(range(len(arr)),arr, color='g')
+                            plt.plot(range(len(arrmov)),arrmov)
+                            for v in peaks:
+                                plt.axvline(x = v, color = 'r') 
+                            plt.show()
+                        peaks = peaks[peaks != v]
 
             #print(f"la waveform num. {i} con peaks {peaks}")
             if len(peaks) == 0:
@@ -249,34 +260,48 @@ class Eventlist:
                     integralMM = 0
                     integralExp = 0
                     rowsHalf = [0]
-
                     try:
-
-                        #calculation on raw data
+                        # Calculation on raw data
                         arrcalc = arr[v-deltav:]
-                        #rows=np.where(arrcalc[:]>mmean1 + stdev1*5)[0]
-                        rowsL = np.where(arrcalc[:] < mmean1)[0]
-                        indexRows=np.where(rowsL >= deltav)[0]
-                        if v < 15000 and len(indexRows) > 0:
-                            arrSignal = arrcalc[0:rowsL[indexRows[0]]]
+                        blocks_size = 25
+                        arrcalc_blocks = np.lib.stride_tricks.sliding_window_view(arrcalc, blocks_size)
+                        meanblock  = arrcalc_blocks.mean(axis=1)
+                        rowsL = np.where(np.logical_and(meanblock > mmean1 - stdev1, meanblock < mmean1 + stdev1))[0]
+                        if len(rowsL) > 0:
+                            # Since sliding windows have stride 1, mean_block indices are 0:(len(arr)-block_size)
+                            # So to index arr_calc you can use rowsL[0] directly
+                            arrSignal = arrcalc[:rowsL[0]]
                         else:
                             arrSignal = arrcalc
+                        # rowsL = np.where(arrcalc[:] < mmean1)[0]
+                        # indexRows=np.where(rowsL >= deltav)[0]
+                        # if v < 15000 and len(indexRows) > 0:
+                        #     arrSignal = arrcalc[0:rowsL[indexRows[0]]]
+                        # else:
+                        #     arrSignal = arrcalc
                         arrSub = np.subtract(arrSignal, mmean1)
                         integral = np.sum(arrSub)
                         
-                        #calculation on MM
+                        # calculation on MM
                         arrcalcMM = arrmov[v-deltav:]
                         #rowsMM=np.where(arrcalcMM[:]>mmean1 + stdev1*5)[0]
-                        rowsLMM = np.where(arrcalcMM[:] < mmean1)[0]
-                        indexRowsMM=np.where(rowsLMM >= deltav)[0]
-                        if v < 15000 and len(indexRowsMM) > 0:
-                            arrSignalMM = arrcalcMM[0:rowsLMM[indexRowsMM[0]]]
+                        arrcalcMM_blocks = np.lib.stride_tricks.sliding_window_view(arrcalcMM, blocks_size)
+                        meanblockMM  = arrcalcMM_blocks.mean(axis=1)
+                        rowsLMM = np.where(np.logical_and(meanblockMM > mmean1 - stdev1, meanblockMM < mmean1 + stdev1))[0]
+                        if len(rowsLMM) > 0:
+                            arrSignalMM = arrcalcMM[:rowsLMM[0]]
                         else:
                             arrSignalMM = arrcalcMM
+                        # rowsLMM = np.where(arrcalcMM[:] < mmean1)[0]
+                        # indexRowsMM=np.where(rowsLMM >= deltav)[0]
+                        # if v < 15000 and len(indexRowsMM) > 0:
+                        #     arrSignalMM = arrcalcMM[0:rowsLMM[indexRowsMM[0]]]
+                        # else:
+                        #     arrSignalMM = arrcalcMM
                         arrSubMM = np.subtract(arrSignalMM, mmean1)
                         integralMM = np.sum(arrSubMM)                
                         
-                        #compare with exponential decay
+                        # compare with exponential decay
                         arrExp = arrSubMM
                         rowsHalf=np.where(arrExp[deltav:]<=arrExp[deltav]/2.0)[0]
                         xr = range(deltav, len(arrExp)+deltav)
@@ -305,10 +330,11 @@ class Eventlist:
                                 plt.show()
                             
                             plt.figure()
-                            plt.plot(range(len(arrSub)),arrSub)
-                            plt.plot(range(len(arrSubMM)),arrSubMM, color='black')
-                            plt.axvline(x = deltav, color = 'r')
-                            plt.plot(xr, valueE, color = 'r')
+                            plt.plot(range(len(arrSub)),arrSub, label='arrSub')
+                            plt.plot(range(len(arrSubMM)),arrSubMM, label='arrSubMM', color='black')
+                            plt.axvline(x=deltav, label='peak', color = 'r')
+                            plt.plot(xr, valueE, label='exponantial decay', color = 'r')
+                            plt.legend()
                             
                             print(f"integral {integral}")
                             print(f"integralMM {integralMM}")
@@ -319,8 +345,9 @@ class Eventlist:
     
                             plt.show()
 
-                    except:
+                    except Exception as e:
                         print(f"EXCEPTION: Peaks non trovati nella waveform {i} del file {filename}")
+                        traceback.print_exception(e)
                         continue
 
 
