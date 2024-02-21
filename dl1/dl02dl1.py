@@ -19,8 +19,7 @@ def moving_average(x, w):
 def get_peak_lists(carray_i, mmean1,
                    deltav=deltav, thr_heur=thr_heur, thr_end_wf=thr_end_wf):
     """
-    This function returns the list of peaks found in each waveform and a flag `F_double` 
-    which will be 1 if there are multiple peaks for the same event and 0 otherwise.
+    This function returns the list of peaks found in each waveform.
     ### Args
     * `carray_i`: The wf
     * `mmean1`: mean of first 100 samples of background of carray_original
@@ -29,11 +28,11 @@ def get_peak_lists(carray_i, mmean1,
                   ithas been chosen with heuristics on data
     """
     # Extract array
-    arr = carray_i[:,-1]
+    arr = carray_i[:,-1].copy()
     # Compute moving average
     arrmov = moving_average(arr, 15)
     #
-    arr3 = arr[:100]
+    arr3 = arr[:100].copy()
     mmean1 = arr3.mean()
     mmean2 = mmean1 * 2 * 0.9 
     # Find peaks
@@ -42,23 +41,38 @@ def get_peak_lists(carray_i, mmean1,
     peaks2 = np.copy(peaks)
     # Filtering the peaks
     for v in peaks2:
-        arrcalcMM = arrmov[v] - arrmov[v-deltav:v+deltav]
+        arrcalcMM = arrmov[v] - arrmov[v-deltav:v+deltav].copy()
         #  
         ind = np.where(arrcalcMM[:] > thr_heur)
         # Remove peaks too small or peaks too close to the end of the wf
         if len(ind[0]) == 0 or v > thr_end_wf:
         # If  v > 16000:
             peaks = peaks[peaks != v]
+    return peaks
+
+def is_doubleevent(peaks, carray_i, mmean1, stdev1):
+    """
+    This function filter from list of peaks only the firtst of double events and return a flag 
+    `F_double` which will be 1 if there are multiple peaks for the same event and 0 otherwise.
+    ### Args
+    * `peaks`: list of peaks detected
+    * `carray_i`: The wf
+    * `mmean1`: mean of first 100 samples of background of carray_original
+    * `stdev1`: stdev of first 100 samples of background of carray_original
+    """
+    # Extract array
+    arr = carray_i[:,-1].copy()
     # Flag for multiple peaks for the same event
     F_double = 0
     # Check of multiple events 
     if len(peaks) > 1:
         peaks2 = np.copy(peaks)
         for v, v1 in zip(peaks2, peaks2[1:]):
-            arrcalc = arr[v-deltav:]
-            arrcalc_blocks = np.lib.stride_tricks.sliding_window_view(arrcalc, blocks_size)
+            arrcalc = arr[v-deltav:].copy()
+            arrcalc_blocks = np.lib.stride_tricks.sliding_window_view(arrcalc, blocksSize_dblEvent)
             meanblock = arrcalc_blocks.mean(axis=1)
-            rowsL = np.where(meanblock <= mmean1)[0]
+            rowsL = np.where(np.logical_and(meanblock > mmean1 - stdev1,
+                                            meanblock < mmean1 + stdev1))[0]
             if len(rowsL) > 0:
                 firts_bkgblock_idx = rowsL[0] + v - deltav
                 if firts_bkgblock_idx > v1:
@@ -139,20 +153,21 @@ def reset_time(carray, start_index, end_index, n_event=0, time_sts=0):
     return year1, month1, day1, hh1, mm1, ss1, usec1, tstart1, tend1
 
 def get_endindex(carray_original, v, mmean1, stdev1, 
-                 deltav=deltav, blocks_size=blocks_size, default_endindex=default_endindex):
-    arr = carray_original[:, -1]
-    arrcalc = arr[v-deltav:]
+                 deltav=deltav, blocks_size=blocksSize_endindex, default_endindex=default_endindex):
+    arr = carray_original[:, -1].copy()
+    arrcalc = arr[v-deltav:].copy()
     arrcalc_blocks = np.lib.stride_tricks.sliding_window_view(arrcalc, blocks_size)
     meanblock = arrcalc_blocks.mean(axis=1)
-    rowsL = np.where(meanblock <= mmean1)[0]
+    rowsL = np.where(np.logical_and(meanblock > mmean1 - stdev1,
+                                    meanblock < mmean1 + stdev1))[0]
     if len(rowsL) > 0:
-        end_index = rowsL[0] + v - deltav + 100
+        end_index = rowsL[0] + v - deltav + blocks_size
     else:
         end_index = default_endindex
     return end_index
 
 def dl02dl1(group_new, h5_out, carray_original, mmean1, stdev1, idx_new,
-            deltac_sx=deltac_sx, deltac_dx=deltac_sx):
+            deltac_sx=deltac_sx, deltac_dx=deltac_dx):
     """
     This function transform a wf of type `dl0` to a `dl1` to save memory space capturing
     only a window around each peak in the interval `[deltac_sx-peak, peak+deltac_dx]`
@@ -168,40 +183,73 @@ def dl02dl1(group_new, h5_out, carray_original, mmean1, stdev1, idx_new,
     """
     atom = tb.Int16Atom()
     filters = tb.Filters(complevel=5, complib='zlib')
-    # Extract the peaks list and the flag for multiple events
-    peaks, isdouble = get_peak_lists(carray_original, mmean1)
-    # Iterate over each peaks list for each wf_i
-    for pk_idx, pk in enumerate(peaks):
+    # Extract the peaks list 
+    peaks = get_peak_lists(carray_original, mmean1)
+    # Get total number of peaks considering also double events
+    n_peaks = len(peaks)
+    # Filter from double events and the flag for multiple events
+    peaks, isdouble = is_doubleevent(peaks, carray_original, mmean1, stdev1)
+    if len(peaks) == 0:
         carray_name = 'wf_%s' % str(idx_new).zfill(6)
-        # Calculate the indices to maintain
-        start_index = max(pk - deltac_sx, 0)
-        end_index = min(pk + deltac_dx, len(carray_original))
-        end_index = get_endindex(carray_original, pk, mmean1, stdev1, default_endindex=end_index)
-        compl2_carray = carray_original.read()[start_index:end_index]
-        shape = (len(compl2_carray), 1)
+        arr = carray_original.read().copy()
+        shape = (len(arr), 1)
         # window_array = carray_original.read()[start_index:end_index, -1]
         # window_array_np = window_array.astype(np.int16)*-1
         # compl2_carray = np.transpose(np.array([window_array_np]))
         # Creiamo un nuovo CArray con gli indici filtrati
-        new_carray = h5_out.create_carray(group_new, carray_name, atom, shape, f'wf{idx_new}', filters=filters, obj=compl2_carray)
+        new_carray = h5_out.create_carray(group_new, carray_name, atom, shape, f'wf{idx_new}', filters=filters, obj=arr)
         # Copy the old attributes
         f_copy_attrs(carray_original, new_carray)
         # Add new attributes
-        new_carray._v_attrs.wf_size     = end_index-start_index
-        new_carray._v_attrs.wf_start    = start_index 
-        new_carray._v_attrs.peak_pos    = pk
-        new_carray._v_attrs.peak_idx    = pk_idx
-        new_carray._v_attrs.original_wf = carray_original._v_name
+        new_carray._v_attrs.wf_size     = -1
+        new_carray._v_attrs.wf_start    = -1 
+        new_carray._v_attrs.n_peaks     = 0
+        new_carray._v_attrs.pk0_pos     = -1
+        new_carray._v_attrs.pk0_tstart  = -1
+        new_carray._v_attrs.peak_pos    = -1
+        new_carray._v_attrs.peak_idx    = -1
         new_carray._v_attrs.mmean1      = mmean1
         new_carray._v_attrs.stdev1      = stdev1
         new_carray._v_attrs.isdouble    = isdouble
-        # Date and time reset attrs
-        new_carray._v_attrs.Year, new_carray._v_attrs.Month, new_carray._v_attrs.Day,                       \
-            new_carray._v_attrs.HH, new_carray._v_attrs.mm, new_carray._v_attrs.ss,                         \
-            new_carray._v_attrs.usec, new_carray._v_attrs.tstart1, new_carray._v_attrs.tend1 =              \
-            reset_time(carray_original, start_index, end_index, time_sts=carray_original._v_attrs.TimeSts)
+        new_carray._v_attrs.original_wf = carray_original._v_name
         # Increase the new indexes of wf
         idx_new += 1
+    else:
+        # Iterate over each peaks list for each wf_i
+        for pk_idx, pk in enumerate(peaks):
+            carray_name = 'wf_%s' % str(idx_new).zfill(6)
+            # Calculate the indices to maintain
+            start_index = max(pk - deltac_sx, 0)
+            end_index = min(pk + deltac_dx, len(carray_original))
+            end_index = get_endindex(carray_original, pk, mmean1, stdev1, default_endindex=end_index)
+            compl2_carray = carray_original.read()[start_index:end_index]
+            shape = (len(compl2_carray), 1)
+            # window_array = carray_original.read()[start_index:end_index, -1]
+            # window_array_np = window_array.astype(np.int16)*-1
+            # compl2_carray = np.transpose(np.array([window_array_np]))
+            # Creiamo un nuovo CArray con gli indici filtrati
+            new_carray = h5_out.create_carray(group_new, carray_name, atom, shape, f'wf{idx_new}', filters=filters, obj=compl2_carray)
+            # Copy the old attributes
+            f_copy_attrs(carray_original, new_carray)
+            # Add new attributes
+            new_carray._v_attrs.wf_size     = end_index-start_index
+            new_carray._v_attrs.wf_start    = start_index 
+            new_carray._v_attrs.n_peaks     = n_peaks
+            new_carray._v_attrs.pk0_pos     = peaks[0]
+            new_carray._v_attrs.pk0_tstart  = carray_original._v_attrs.tstart
+            new_carray._v_attrs.peak_pos    = pk
+            new_carray._v_attrs.peak_idx    = pk_idx
+            new_carray._v_attrs.mmean1      = mmean1
+            new_carray._v_attrs.stdev1      = stdev1
+            new_carray._v_attrs.isdouble    = isdouble
+            new_carray._v_attrs.original_wf = carray_original._v_name
+            # Date and time reset attrs
+            new_carray._v_attrs.Year, new_carray._v_attrs.Month, new_carray._v_attrs.Day,                       \
+                new_carray._v_attrs.HH, new_carray._v_attrs.mm, new_carray._v_attrs.ss,                         \
+                new_carray._v_attrs.usec, new_carray._v_attrs.tstart1, new_carray._v_attrs.tend1 =              \
+                reset_time(carray_original, start_index, end_index, time_sts=carray_original._v_attrs.TimeSts)
+            # Increase the new indexes of wf
+            idx_new += 1
     return idx_new
 
 
