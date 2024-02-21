@@ -7,6 +7,7 @@ import pandas as pd
 from time import time
 from tables import *
 from pathlib import Path
+from tqdm import tqdm
 import traceback
 import matplotlib.pyplot as plt
 import matplotlib.pyplot as plt
@@ -80,6 +81,10 @@ class GFhandler2:
         #self.logger.debug(f" Wrote {filename} and '.ok' file. Took {round(time()-start,5)} sec")
 
 class Eventlist:
+    def __init__(self) -> None:
+        self.dl0_peaks = None
+        self.version = None
+
 
     def moving_average(self, x, w):
         return np.convolve(x, np.ones(w), 'valid') / w
@@ -133,6 +138,44 @@ class Eventlist:
             os.makedirs(directory_path)
             print(f"La directory '{directory_path}' è stata creata.")
 
+    def __getPeaks(self, peaks, data):
+        version = data._v_attrs.VERSION
+        if version=='3.1.1' or version=='3.2.0':
+            # If is a DL1
+            start_off = data._v_attrs.wf_start
+            self.dl0_peaks = [pk + start_off for pk in peaks]
+        else:
+            # If is a DL0
+            self.dl0_peaks = peaks
+        return self.dl0_peaks
+    
+    def __getXrange(self, data):
+        version = data._v_attrs.VERSION
+        if version=='3.1.1' or version=='3.2.0':
+            # If is a DL1
+            xr = np.arange(data._v_attrs.wf_start, data._v_attrs.wf_size + data._v_attrs.wf_start)
+        else:
+            # If is a DL0
+            xr = np.arange(len(data))
+        return xr
+
+    def __getWFindex(self, i, data):
+        version = data._v_attrs.VERSION
+        if version=='3.1.1' or version=='3.2.0':
+            # If is a DL1
+            i = int(data._v_attrs.original_wf.split('_')[1])
+        return i
+
+    def __getPKindex(self, j, data):
+        version = data._v_attrs.VERSION
+        if version=='3.1.1' or version=='3.2.0':
+            # If is a DL1
+            if data._v_attrs.n_peaks == 1:
+                return data._v_attrs.peak_idx
+            else:
+                # NOTE: in DL0 wf with more than a PK get a +1
+                return data._v_attrs.peak_idx + 1
+        return j
 
     def process_file(self, filename, temperatures, outdir, log = False, startEvent=0, endEvent=-1):
         print("Processing " + filename)
@@ -159,7 +202,7 @@ class Eventlist:
         #print(header)
         shape_data = -1
         lenwf = -1
-        for i, data in enumerate(group):
+        for i, data in tqdm(enumerate(group), total=endEvent+1 if endEvent > 0 else group._g_getnchildren()):
             if i < int(startEvent):
                 continue
             if endEvent > 0:
@@ -185,7 +228,7 @@ class Eventlist:
             else:
                 y = data[:,shape_data]
 
-            arr = y
+            arr = y.copy()
             arrmov = self.moving_average(arr, 15)
 
             if data._v_attrs.VERSION == "3.1.1" or data._v_attrs.VERSION == "3.2.0":
@@ -195,52 +238,41 @@ class Eventlist:
                 stdev1 = data._v_attrs.stdev1
                 if not data._v_attrs.isdouble:
                     peaks  = [data._v_attrs.peak_pos - data._v_attrs.wf_start]
-                    print(f"Waveform num. {i} ##############################")
-                    print(f"la waveform num. {i} ha il seguente peak: {peaks} (in dl0 {data._v_attrs.peak_pos}) e mean value {mmean1} and stdev {stdev1}")
                 else:
                     peaks, _ = find_peaks(arrmov, height=mmean1 * 2 * 0.9, width=15, distance=25)
-                    if log == True:
-                        print(f"Waveform num. {i} ##############################")
-                        print(f"la waveform num. {i} ha i seguenti peaks: {[v + data._v_attrs.wf_start for v in peaks]} "
-                              f"e mean value {mmean1} and stdev {stdev1}")    
             else:
                 arr3 = arr[:100]
                 mmean1 = arr3.mean()
                 stdev1 = arr3.std()
                 mmean2 = mmean1 * 2 * 0.9 
                 peaks, _ = find_peaks(arrmov, height=mmean2, width=15, distance=25)
-                if log == True:
-                    print(f"Waveform num. {i} ##############################")
-                    print(f"la waveform num. {i} ha i seguenti peaks: {peaks} e mean value {mmean1} and stdev {stdev1}")
+            
             deltav = 20
+            # if data._v_attrs.VERSION == "1.1" or data._v_attrs.VERSION == "2.0":
+            peaks2 = np.copy(peaks)
+            #filtraggio picchi
+            for v in peaks2:
+                arrcalcMM = arrmov[v] - arrmov[v-deltav:v+deltav].copy()
+                #80 has been chosen with heuristics on data 
+                ind = np.where(arrcalcMM[:] > 80)
+                #remove peaks too small or peaks too close to the end of the wf
+                if len(ind[0]) == 0 or v > 16000:
+                #if  v > 16000:
+                    if log == True:
+                        print("delete peak")
+                        print(peaks)
+                        plt.figure()
+                        plt.plot(range(len(arr)),arr, color='g')
+                        plt.plot(range(len(arrmov)),arrmov)
+                        for v in peaks:
+                            plt.axvline(x = v, color = 'r') 
+                        plt.show()
+                    peaks = peaks[peaks != v]
+            
+            if log == True:
+                print(f"Waveform num. {i} ##############################")
+                print(f"la waveform num. {i} ha i seguenti peaks: {self.__getPeaks(peaks, data)} e mean value {mmean1} and stdev {stdev1}")
 
-                #Print the original waveform
-                #plt.figure()
-                #plt.plot(range(len(arr)),arr, color='g')
-                #plt.plot(range(len(arrmov)),arrmov)
-
-            if data._v_attrs.VERSION == "1.1" or data._v_attrs.VERSION == "2.0":
-                peaks2 = np.copy(peaks)
-                #filtraggio picchi
-                for v in peaks2:
-                    arrcalcMM = arrmov[v] - arrmov[v-deltav:v+deltav]
-                    #80 has been chosen with heuristics on data 
-                    ind = np.where(arrcalcMM[:] > 80)
-                    #remove peaks too small or peaks too close to the end of the wf
-                    if len(ind[0]) == 0 or v > 16000:
-                    #if  v > 16000:
-                        if log == True:
-                            print("delete peak")
-                            print(peaks)
-                            plt.figure()
-                            plt.plot(range(len(arr)),arr, color='g')
-                            plt.plot(range(len(arrmov)),arrmov)
-                            for v in peaks:
-                                plt.axvline(x = v, color = 'r') 
-                            plt.show()
-                        peaks = peaks[peaks != v]
-
-            #print(f"la waveform num. {i} con peaks {peaks}")
             if len(peaks) == 0:
                 current_tstart = tstart
                 temp = self.get_temperature(tstart)
@@ -253,7 +285,6 @@ class Eventlist:
                     plt.plot(range(len(arrmov)),arrmov)
                     plt.show()
             else:
-
                 j=0
                 for v in peaks:
                     integral = 0
@@ -270,39 +301,26 @@ class Eventlist:
                         if len(rowsL) > 0:
                             # Since sliding windows have stride 1, mean_block indices are 0:(len(arr)-block_size)
                             # So to index arr_calc you can use rowsL[0] directly
-                            arrSignal = arrcalc[:rowsL[0]]
+                            arrSignal = arrcalc[:rowsL[0]].copy()
                         else:
-                            arrSignal = arrcalc
-                        # rowsL = np.where(arrcalc[:] < mmean1)[0]
-                        # indexRows=np.where(rowsL >= deltav)[0]
-                        # if v < 15000 and len(indexRows) > 0:
-                        #     arrSignal = arrcalc[0:rowsL[indexRows[0]]]
-                        # else:
-                        #     arrSignal = arrcalc
+                            arrSignal = arrcalc.copy()
                         arrSub = np.subtract(arrSignal, mmean1)
                         integral = np.sum(arrSub)
                         
                         # calculation on MM
-                        arrcalcMM = arrmov[v-deltav:]
-                        #rowsMM=np.where(arrcalcMM[:]>mmean1 + stdev1*5)[0]
+                        arrcalcMM = arrmov[v-deltav:].copy()
                         arrcalcMM_blocks = np.lib.stride_tricks.sliding_window_view(arrcalcMM, blocks_size)
                         meanblockMM  = arrcalcMM_blocks.mean(axis=1)
                         rowsLMM = np.where(np.logical_and(meanblockMM > mmean1 - stdev1, meanblockMM < mmean1 + stdev1))[0]
                         if len(rowsLMM) > 0:
-                            arrSignalMM = arrcalcMM[:rowsLMM[0]]
+                            arrSignalMM = arrcalcMM[:rowsLMM[0]].copy()
                         else:
-                            arrSignalMM = arrcalcMM
-                        # rowsLMM = np.where(arrcalcMM[:] < mmean1)[0]
-                        # indexRowsMM=np.where(rowsLMM >= deltav)[0]
-                        # if v < 15000 and len(indexRowsMM) > 0:
-                        #     arrSignalMM = arrcalcMM[0:rowsLMM[indexRowsMM[0]]]
-                        # else:
-                        #     arrSignalMM = arrcalcMM
+                            arrSignalMM = arrcalcMM.copy()
                         arrSubMM = np.subtract(arrSignalMM, mmean1)
                         integralMM = np.sum(arrSubMM)                
                         
                         # compare with exponential decay
-                        arrExp = arrSubMM
+                        arrExp = arrSubMM.copy()
                         rowsHalf=np.where(arrExp[deltav:]<=arrExp[deltav]/2.0)[0]
                         xr = range(deltav, len(arrExp)+deltav)
                         xr2 = range(len(arrExp))
@@ -314,35 +332,37 @@ class Eventlist:
                             lenss = v+len(valueE)
                             if lenss > lenwf:
                                 lenss = lenwf
-                            ss = arrmov[v-deltav:lenss]
+                            # NOTE: togliendo .copy() arrmov cambia. Con lui cambiano anche i plots e i valori degli integrali.
+                            #       in teoria non dovrebbe cambiare nulla, ma ChatGPT suggerisce che talvolta quando due array 
+                            #       condividono lo stesso spazio in memoria alcune operazioni anche se non eseguono accessi diretti
+                            #       potrebbero modificarne il valore associato 
+                            ss = arrmov[v-deltav:lenss].copy()
                             ss[deltav:lenss] = ss[deltav:lenss] - valueE[0:len(ss[deltav:lenss])]
                             ss[0:deltav] = np.full(len(ss[0:deltav] ), mmean1)
 
                         if log == True:
                             if j == 0:
                                 plt.figure()
-                                plt.plot(range(len(arr)),arr, color='g')
-                                plt.plot(range(len(arrmov)),arrmov)
-            
-                                for v in peaks:
-                                    plt.axvline(x = v, color = 'r') 
-    
+                                xr_arr = self.__getXrange(data)
+                                plt.plot(xr_arr, arr, color='g', label='arr')
+                                plt.plot(xr_arr[:len(arrmov)], arrmov, label='arrmov')
+                                for v in self.__getPeaks(peaks, data):
+                                    plt.axvline(x = v, color = 'r', label='peaks')
+                                plt.legend()
                                 plt.show()
                             
+                            print(f"integral {integral}")
+                            print(f"integralMM {integralMM}")
+                            print(f"integralEXP {integralExp}")
+
                             plt.figure()
                             plt.plot(range(len(arrSub)),arrSub, label='arrSub')
                             plt.plot(range(len(arrSubMM)),arrSubMM, label='arrSubMM', color='black')
                             plt.axvline(x=deltav, label='peak', color = 'r')
                             plt.plot(xr, valueE, label='exponantial decay', color = 'r')
-                            plt.legend()
-                            
-                            print(f"integral {integral}")
-                            print(f"integralMM {integralMM}")
-                            print(f"integralEXP {integralExp}")
-                        
                             if len(peaks) > 1:
-                                plt.plot(range(len(ss)),ss-mmean1)
-    
+                                plt.plot(range(len(ss)),ss-mmean1, label='ss-mmean1')
+                            plt.legend()
                             plt.show()
 
                     except Exception as e:
@@ -350,18 +370,20 @@ class Eventlist:
                         traceback.print_exception(e)
                         continue
 
-
                     temp = float(self.get_temperature(tstart))
-
 
                     if len(peaks) == 1:
                         current_tstart = float(tstart)
-                        f.write(f"{i}\t{0}\t{tstart}\t{peaks[0]}\t{y[peaks[0]]}\t{integral}\t{integralMM}\t{integralExp}\t{rowsHalf[0]}\t{temp:.2f}\n")
-                        dl2_data.append([i, 0, current_tstart, peaks[0], y[peaks[0]], integral, integralMM, integralExp, rowsHalf[0],temp])
+                        # f.write(f"{i}\t{0}\t{tstart}\t{data[0]}\t{y[peaks[0]]}\t{integral}\t{integralMM}\t{integralExp}\t{rowsHalf[0]}\t{temp:.2f}\n")
+                        f.write(f"{self.__getWFindex(i, data)}\t{self.__getPKindex(0, data)}\t{tstart}\t{self.__getPeaks(peaks, data)[0]}\t{y[peaks[0]]}\t{integral}\t{integralMM}\t{integralExp}\t{rowsHalf[0]}\t{temp:.2f}\n")
+                        # dl2_data.append([i, 0, current_tstart, peaks[0], y[peaks[0]], integral, integralMM, integralExp, rowsHalf[0],temp])
+                        dl2_data.append([self.__getWFindex(i, data), self.__getPKindex(0, data), current_tstart, self.__getPeaks(peaks, data)[0], y[peaks[0]], integral, integralMM, integralExp, rowsHalf[0],temp])
                     else:
                         current_tstart = float(((peaks[j] - peaks[0]) * 8e-9) + tstart)
-                        f.write(f"{i}\t{j+1}\t{current_tstart}\t{peaks[j]}\t{y[peaks[j]]}\t{integral}\t{integralMM}\t{integralExp}\t{rowsHalf[0]}\t{temp:.2f}\n")
-                        dl2_data.append([i, j+1, current_tstart, peaks[j], y[peaks[j]], integral, integralMM, integralExp, rowsHalf[0],temp])
+                        # f.write(f"{i}\t{j+1}\t{current_tstart}\t{peaks[j]}\t{y[peaks[j]]}\t{integral}\t{integralMM}\t{integralExp}\t{rowsHalf[0]}\t{temp:.2f}\n")
+                        f.write(f"{self.__getWFindex(i, data)}\t{self.__getPKindex(j+1, data)}\t{current_tstart}\t{self.__getPeaks(peaks, data)[j]}\t{y[peaks[j]]}\t{integral}\t{integralMM}\t{integralExp}\t{rowsHalf[0]}\t{temp:.2f}\n")
+                        # dl2_data.append([i, j+1, current_tstart, peaks[j], y[peaks[j]], integral, integralMM, integralExp, rowsHalf[0],temp])
+                        dl2_data.append([self.__getWFindex(i, data), self.__getPKindex(j+1, data), current_tstart, self.__getPeaks(peaks, data)[j], y[peaks[j]], integral, integralMM, integralExp, rowsHalf[0], temp])
 
                     j = j + 1
 
