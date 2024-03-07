@@ -237,7 +237,8 @@ class EventlistDL0(EventlistGeneral):
                         blocks_size = 25
                         arrcalc_blocks = np.lib.stride_tricks.sliding_window_view(arrcalc, blocks_size)
                         meanblock  = arrcalc_blocks.mean(axis=1)
-                        rowsL = np.where(np.logical_and(meanblock > mmean1 - stdev1, meanblock < mmean1 + stdev1))[0]
+                        rowsL = np.where(np.logical_and(meanblock > mmean1 - stdev1, 
+                                                        meanblock < mmean1 + stdev1))[0]
                         if len(rowsL) > 0:
                             # Since sliding windows have stride 1, mean_block indices are 0:(len(arr)-block_size)
                             # So to index arr_calc you can use rowsL[0] directly
@@ -250,7 +251,8 @@ class EventlistDL0(EventlistGeneral):
                         arrcalcMM = arrmov[v-deltav:].copy()
                         arrcalcMM_blocks = np.lib.stride_tricks.sliding_window_view(arrcalcMM, blocks_size)
                         meanblockMM  = arrcalcMM_blocks.mean(axis=1)
-                        rowsLMM = np.where(np.logical_and(meanblockMM > mmean1 - stdev1, meanblockMM < mmean1 + stdev1))[0]
+                        rowsLMM = np.where(np.logical_and(meanblockMM > mmean1 - stdev1, 
+                                                          meanblockMM < mmean1 + stdev1))[0]
                         if len(rowsLMM) > 0:
                             arrSignalMM = arrcalcMM[:rowsLMM[0]].copy()
                         else:
@@ -446,7 +448,8 @@ class EventlistDL1(EventlistGeneral):
                         blocks_size = 25
                         arrcalc_blocks = np.lib.stride_tricks.sliding_window_view(arrcalc, blocks_size)
                         meanblock  = arrcalc_blocks.mean(axis=1)
-                        rowsL = np.where(np.logical_and(meanblock > mmean1 - stdev1, meanblock < mmean1 + stdev1))[0]
+                        rowsL = np.where(np.logical_and(meanblock > mmean1 - stdev1, 
+                                                        meanblock < mmean1 + stdev1))[0]
                         if len(rowsL) > 0:
                             # Since sliding windows have stride 1, mean_block indices are 0:(len(arr)-block_size)
                             # So to index arr_calc you can use rowsL[0] directly
@@ -459,7 +462,8 @@ class EventlistDL1(EventlistGeneral):
                         arrcalcMM = arrmov[v-deltav:].copy()
                         arrcalcMM_blocks = np.lib.stride_tricks.sliding_window_view(arrcalcMM, blocks_size)
                         meanblockMM  = arrcalcMM_blocks.mean(axis=1)
-                        rowsLMM = np.where(np.logical_and(meanblockMM > mmean1 - stdev1, meanblockMM < mmean1 + stdev1))[0]
+                        rowsLMM = np.where(np.logical_and(meanblockMM > mmean1 - stdev1, 
+                                                          meanblockMM < mmean1 + stdev1))[0]
                         if len(rowsLMM) > 0:
                             arrSignalMM = arrcalcMM[:rowsLMM[0]].copy()
                         else:

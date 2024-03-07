@@ -50,24 +50,28 @@ class EventlistSnapshot():
         * `peaks`: list of peaks detected
         """
         # Extract array
-        arr = self.carray_original[:,-1].copy()
+        # arr = self.carray_original[:,-1].copy()
         # Flag for multiple peaks for the same event
         F_double = 0
+        peaks_idx = np.array(range(len(peaks)))
         # Check of multiple events 
         if len(peaks) > 1:
-            peaks2 = np.copy(peaks)
+            peaks2    = np.copy(peaks)
             for v, v1 in zip(peaks2, peaks2[1:]):
-                arrcalc = arr[v-self.deltav:].copy()
-                arrcalc_blocks = np.lib.stride_tricks.sliding_window_view(arrcalc, self.blocksSize_dblEvent)
-                meanblock = arrcalc_blocks.mean(axis=1)
-                rowsL = np.where(np.logical_and(meanblock > self.mmean1 - self.stdev1,
-                                                meanblock < self.mmean1 + self.stdev1))[0]
+                # arrcalc = arr[v-self.deltav:].copy()
+                # arrcalc_blocks = np.lib.stride_tricks.sliding_window_view(arrcalc, self.blocksSize_dblEvent)
+                # meanblock = arrcalc_blocks.mean(axis=1)
+                meanblock = self.meanblocks[v:].copy()
+                rowsL = np.where(np.logical_and(meanblock > self.mmean1 - 1,
+                                                meanblock < self.mmean1 + 1))[0]
                 if len(rowsL) > 0:
-                    firts_bkgblock_idx = rowsL[0] + v - self.deltav
+                    firts_bkgblock_idx = v + rowsL[0]
                     if firts_bkgblock_idx > v1:
-                        peaks = peaks[peaks != v1]
+                        not_v1 = peaks != v1
+                        peaks_idx = peaks_idx[not_v1]
+                        peaks = peaks[not_v1]
                         F_double = 1
-        return peaks, F_double
+        return peaks, peaks_idx, F_double
     
     def __decompose_date(self, dt): 
         dt_str = str(dt)
@@ -139,16 +143,16 @@ class EventlistSnapshot():
         self.carray_new.attrs['VERSION'] = f"3.{self.carray_original.attrs['VERSION']}"
 
     def __get_endindex(self, v):
-        arr = self.carray_original[:, -1].copy()
-        arrcalc = arr[v-self.deltav:].copy()
-        arrcalc_blocks = np.lib.stride_tricks.sliding_window_view(arrcalc, self.blocksSize_endindex)
-        meanblock = arrcalc_blocks.mean(axis=1)
-        rowsL = np.where(np.logical_and(meanblock > self.mmean1 - self.stdev1,
-                                        meanblock < self.mmean1 + self.stdev1))[0]
+        # arr = self.carray_original[:, -1].copy()
+        # arrcalc = arr[v-self.deltav:].copy()
+        # arrcalc_blocks = np.lib.stride_tricks.sliding_window_view(arrcalc, self.blocksSize_endindex)
+        meanblock = self.meanblocks[v:].copy()
+        rowsL = np.where(np.logical_and(meanblock > self.mmean1 - 1,
+                                        meanblock < self.mmean1 + 1))[0]
         if len(rowsL) > 0:
-            end_index = rowsL[0] + v - self.deltav + 2*self.blocksSize_endindex
+            end_index = v + rowsL[0] + 2*self.blocksSize_endindex
         else:
-            end_index = -1
+            end_index = len(self.carray_original)
         return end_index
 
     def __dl02dl1(self, group_new, h5_out, idx_new):
@@ -167,7 +171,7 @@ class EventlistSnapshot():
         # Get total number of peaks considering also double events
         n_peaks = len(peaks)
         # Filter from double events and the flag for multiple events
-        peaks, isdouble = self.__is_doubleevent(peaks)
+        peaks, peaks_idx, isdouble = self.__is_doubleevent(peaks)
         if len(peaks) == 0:
             carray_name = 'wf_%s' % str(idx_new).zfill(6)
             arr = self.carray_original.read().copy()
@@ -195,7 +199,7 @@ class EventlistSnapshot():
             idx_new += 1
         else:
             # Iterate over each peaks list for each wf_i
-            for pk_idx, pk in enumerate(peaks):
+            for pk_idx, pk in zip(peaks_idx, peaks):
                 carray_name = 'wf_%s' % str(idx_new).zfill(6)
                 # Calculate the indices to maintain
                 start_index = max(pk - self.deltac_sx, 0)
@@ -260,6 +264,8 @@ class EventlistSnapshot():
                     arr = self.carray_original[:100,shape_data].copy()
                     self.mmean1 = arr.mean()
                     self.stdev1 = arr.std()
+                    self.meanblocks = np.lib.stride_tricks.sliding_window_view(self.carray_original[:, shape_data], self.blocksSize_dblEvent)
+                    self.meanblocks = self.meanblocks.mean(axis=1)
                     # 
                     j = self.__dl02dl1(group1, h5_out, j)
 
