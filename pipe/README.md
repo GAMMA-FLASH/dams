@@ -87,7 +87,7 @@
 
     ```
     cd worker
-    python Command.py ../config.json start all
+    python Command.py ../testgammaflash/config.json start all
     ```
 
 4.  Now you can start the Publisher service
