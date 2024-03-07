@@ -1,0 +1,6 @@
+colore_rosa = '\033[95m'
+colore_ciano = '\033[96m'
+colore_verde = '\033[92m'
+colore_giallo = '\033[93m'
+colore_rosso = '\033[91m'
+reset_colore = '\033[0m'
