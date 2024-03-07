@@ -94,5 +94,5 @@
 
     * Publisher service
     ```
-    ./test_GammaFlash.py 1
+    ./test_GammaFlash.py 0
     ```
