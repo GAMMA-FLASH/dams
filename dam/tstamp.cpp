@@ -73,6 +73,13 @@ void *ppsAcqThreadFcn(void *ptr) {
         	m_status += (uint32_t)TimeStamp::TS_NOPPS;
         	sleep(1);
         }
+/*
+	if (m_status) {
+		g_systemInfo.flags |= (uint8_t)m_status;
+	} else {
+		g_systemInfo.flags &= ~(uint8_t)(TimeStamp::TS_NOPPS+TimeStamp::TS_NOUART);
+	}
+*/
     }
     
     // This point should never be reached
@@ -114,6 +121,9 @@ static inline void gga_read() {
 								m_tstamp_ss = (uint32_t)(g_uart_buff[11]-'0')*10 + (uint32_t)(g_uart_buff[12]-'0');
 								m_tstamp_us = (uint32_t)(g_uart_buff[14]-'0')*100000 + (uint32_t)(g_uart_buff[15]-'0')*10000 + (uint32_t)(g_uart_buff[16]-'0');
 								
+
+								//printf("%02X %s\n", m_status, g_uart_buff);
+
 								pthread_mutex_unlock(&m_tstamp_lock);
 								
 							} 
