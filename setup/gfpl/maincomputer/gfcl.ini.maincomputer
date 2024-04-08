@@ -1,0 +1,19 @@
+[DEFAULT]
+Test = no
+
+[INFLUXDB]
+Enable_Counts = yes 
+Enable_Hk = yes
+URL = 127.0.0.1:8086
+Token = 2lAUWyLoXIxI7wOpCQXxTQaC5UgAjGuCAkdnK7L5PsR4llllRIHAbCIoQ6QX9LEAdvMC1qaFeOVU9kLgQmmQLA== 
+Org = GAMMA-FLASH
+Bucket = RP-COUNTS
+BucketHk = HK 
+
+[SPECTRUM_AN]
+Enable = no
+Venv = /opt/gflashenv/bin/activate
+ProcessName = eventlist_v4.py 
+ProcessArgs = 
+ProcessOut = 
+

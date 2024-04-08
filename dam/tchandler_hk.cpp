@@ -21,6 +21,8 @@ int TcHandler::sendHk() {
     // TODO: handle timeout on txBegin
     int res = sendBegin();
     if (res == 0) {
+
+		//printf("HK %02X\n", (uint8_t)g_systemInfo.flags);
             
         if (g_ctrlServer.getState() == TcpServer::STT_ACTIVE) {
         
@@ -38,9 +40,9 @@ int TcHandler::sendHk() {
             Data_Hk* data = (Data_Hk*)(buff+sizeof(Header));
             data->type     = Data_Hk::TYPE;
         	data->subType  = Data_Hk::SUB_TYPE;
-            data->state = g_systemInfo.state;
-            data->flags = g_systemInfo.flags;
-            data->waveCount = g_systemInfo.waveCount;
+            data->state = (uint8_t)g_systemInfo.state;
+            data->flags = (uint8_t)g_systemInfo.flags;
+            data->waveCount = g_systemInfo.totAcqWformCount;
     
             //data->encode();
             header->encode();
@@ -49,6 +51,8 @@ int TcHandler::sendHk() {
             res = g_ctrlServer.send(buff, buffSz);
             
         }
+	
+	g_systemInfo.totAcqWformCount = 0;
         
         sendEnd();
             

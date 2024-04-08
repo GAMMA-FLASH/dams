@@ -19,11 +19,14 @@ ConfigInfo::ConfigInfo() {
     
     damApid = DAM_APID;
    
-   	damRunID = DAM_RUN_ID;
-    damSessionID = DAM_SESSION_ID;
-    damConfigID = DAM_CONFIG_ID;
+   	damRunID 		= DAM_RUN_ID;
+    damSessionID 	= DAM_SESSION_ID;
+    damConfigID 	= DAM_CONFIG_ID;
     
-    cfgMonitorPeriodSecs = CFG_MONITOR_PERIOD_SECS;
+    cfgMonitorPeriodSecs	= CFG_MONITOR_PERIOD_SECS;
+    cfgSendWform 			= CFG_SEND_WFORM;
+    cfgSaveWform 			= CFG_SAVE_WFORM;
+    cfgSaveWformNo 			= CFG_SAVE_WFORM_NO;
      
     oscEqLevel 		= OSC_EQ_LEVEL;
     oscDecimation 	= OSC_DECIMATION;
@@ -32,6 +35,8 @@ ConfigInfo::ConfigInfo() {
     oscTrigHyst 	= OSC_TRIG_HYST;
     oscTrigDelay 	= OSC_TRIG_DELAY;
     oscTrigDebounce = OSC_TRIG_DEBOUNCE;
+    
+    
      
 }
 
@@ -135,6 +140,9 @@ int ConfigInfo::loadConfig(const char *fname) {
         xml_node cfg = doc.child("Configuration");
         if (cfg) {
         	cfgMonitorPeriodSecs = cfg.attribute("monitorPeriodSecs").as_int();
+        	cfgSendWform = cfg.attribute("sendWform").as_bool();
+        	cfgSaveWform = cfg.attribute("saveWform").as_bool();
+    		cfgSaveWformNo = cfg.attribute("saveWformNo").as_int();
         }
         
         xml_node osc = doc.child("Oscilloscope");
@@ -184,6 +192,23 @@ int ConfigInfo::saveConfig(const char *fname) {
         
         sprintf(str, "%04d", cfgMonitorPeriodSecs);
         cfg.append_attribute("monitorPeriodSecs") = str;
+        
+        if (cfgSendWform) {
+        	sprintf(str, "yes");
+        } else {
+        	sprintf(str, "no");
+        }
+        cfg.append_attribute("sendWform") = str;
+        
+        if (cfgSaveWform) {
+        	sprintf(str, "yes");
+        } else {
+        	sprintf(str, "no");
+        }
+        cfg.append_attribute("saveWform") = str;
+        
+        sprintf(str, "%d", cfgSaveWformNo);
+        cfg.append_attribute("saveWformNo") = str;
         
         xml_node osc = doc.append_child("Oscilloscope");
         

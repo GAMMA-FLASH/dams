@@ -27,9 +27,20 @@ DataStore::DataStore() {
     
     memset(path, 0, DS_MAX_NAME_LEN);
     
+    pFile = 0;
+    
+}
+
+DataStore::~DataStore() {
+
 }
 
 int DataStore::init() {
+
+	if (pFile) {
+		fclose(pFile);
+		pFile = 0;
+	}
     
     // Check if a directory exists
     struct stat st = {0};
@@ -62,3 +73,64 @@ int DataStore::init() {
     return 0;
     
 }
+
+int DataStore::openFile() {
+	
+	if (!pFile) {
+	
+		// Create file name
+		char fname[DS_MAX_NAME_LEN];
+		
+		sprintf(fname, "%s/%06d_", path, g_systemInfo.fileCount);
+		
+		// fpath time field
+    	time_t ltime;
+    	ltime = time(NULL);
+        
+    	struct tm *tmp;
+    	tmp = localtime(&ltime);
+        
+    	char ftime[DS_MAX_NAME_LEN];
+    	strftime(ftime, sizeof(ftime), "%Y%m%d%H%M%S", tmp);
+
+    	// fpath
+    	strcat(fname, ftime);
+	
+		TRACE("DataStore::openFile: Current file %s\n", fname);
+	
+		// Open file
+		pFile = fopen(fname, "wb");
+		
+		g_systemInfo.fileCount++;
+		
+		return 0;
+	
+	} else {
+		return -1;
+	}
+
+}
+
+int DataStore::save(void *buff, uint32_t buffSz) {
+	if (pFile) {
+		// TODO: handle errors
+		fwrite(buff, 1, buffSz, pFile);
+		fflush(pFile);
+		return 0;
+	} else {
+		return -1;
+	}
+	
+}
+
+int DataStore::closeFile() {
+	if (pFile) {
+		fclose(pFile);
+		pFile = 0;
+		return 0;
+	} else {
+		return -1;
+	}
+}
+    
+

@@ -1,0 +1,20 @@
+[DEFAULT]
+Test = no
+
+
+[INFLUXDB]
+Enable_Counts = no
+Enable_Hk = yes
+URL = 172.17.0.1:8086
+Token = GGRHiyGKPdKZ0EF9ZiV2RL1zrU9mYbRv3D780CWZxmoDcmCtJHeAn9YhY8CrQpRpTRmCCkE8vWaPAsy3P3TU5Q== 
+Org = GAMMA-FLASH
+Bucket = RP-COUNTS
+BucketHk = HK
+
+[SPECTRUM_AN]
+Enable = yes
+Venv = gammaflash
+ProcessName = /home/usergamma/workspace/dams/dl2/eventlist_v4.py
+ProcessArgs =  
+ProcessOut = /home/usergamma/logs
+

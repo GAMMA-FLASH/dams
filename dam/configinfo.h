@@ -32,6 +32,9 @@ public:
     int damConfigID;
     
     int cfgMonitorPeriodSecs;
+    bool cfgSendWform;
+    bool cfgSaveWform;
+    int cfgSaveWformNo;
     
     int oscEqLevel;
     int oscDecimation;
@@ -40,6 +43,8 @@ public:
     int oscTrigHyst;
     int oscTrigDelay;
     int oscTrigDebounce;
+    
+    
     
 };
 

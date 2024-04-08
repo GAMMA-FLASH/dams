@@ -9,6 +9,7 @@
 #define __SYSTEMINFO_H__
 
 #include <stdio.h>
+#include <atomic>
 
 class SystemInfo {
    
@@ -31,10 +32,20 @@ public:
     uint32_t state;
     uint32_t flags;
     
-    uint32_t totAcqWaveCount;
-    uint32_t totSentWaveCount;
+    // Total acquired wforms since start
+    std::atomic<unsigned int>  totAcqWformCount;
     
-    uint32_t waveCount;
+    // Counter used to sto acquisition
+    uint32_t acqWformCount;
+    
+    // Wforms sent on socket
+   	uint32_t sentWformCount;
+     
+    // Wforms saved on the current file
+    uint32_t savedWformCount;
+    
+    // Number of files
+    uint32_t fileCount;
     
     uint8_t source;
     uint32_t maxWaveNo;

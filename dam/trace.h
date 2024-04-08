@@ -4,7 +4,7 @@
 #include <cstdio>
 
 /* Enable/disable trace macros */
-#define TRACEON         // Generic trace
+//#define TRACEON         // Generic trace
 
 #ifdef TRACEON
 #define TRACE( format, ... )   printf( format, ##__VA_ARGS__ )

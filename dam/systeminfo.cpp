@@ -17,9 +17,13 @@ SystemInfo::SystemInfo() {
     state = STT_SERVICE;
     flags = FLG_PPS_NOK + FLG_GPS_NOK;
     packetCount = 0;
-    totAcqWaveCount = 0;
-    totSentWaveCount = 0;
-    waveCount = 0;
+    
+    totAcqWformCount = 0;
+    acqWformCount = 0;
+   	sentWformCount = 0;
+    savedWformCount = 0;
+    
+    fileCount = 0;
     
 }
 

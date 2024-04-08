@@ -14,8 +14,8 @@
 // Software version
 //--------------------------------------------------------------------------
 #define ASW_VER 2
-#define ASW_SUB 3
-#define ASW_DEP 74
+#define ASW_SUB 4
+#define ASW_DEP 3
 
 //--------------------------------------------------------------------------
 // Appplication identification
@@ -49,6 +49,9 @@
 // Monitor loop
 //--------------------------------------------------------------------------
 #define CFG_MONITOR_PERIOD_SECS 5
+#define CFG_SEND_WFORM			true
+#define CFG_SAVE_WFORM			false
+#define CFG_SAVE_WFORM_NO		10000
 
 //--------------------------------------------------------------------------
 // Waveform FIFO
@@ -64,9 +67,14 @@
 #define OSC_EQ_LEVEL		OSC_FPGA_EQ_LV
 #define OSC_DECIMATION 		OSC_FPGA_DEC1
 #define OSC_TRIG_SOURCE 	OSC_FPGA_TSRC_CHA_POS
-#define OSC_TRIG_THRESH 	2048
+#define OSC_TRIG_THRESH 	128
 #define OSC_TRIG_HYST 		50
-#define OSC_TRIG_DELAY 		(10*1024)
+#define OSC_TRIG_DELAY 		1024
 #define OSC_TRIG_DEBOUNCE 	10
 
+//--------------------------------------------------------------------------
+// Data store
+//--------------------------------------------------------------------------
+#define DS_SAVE_WFORM		0
+#define DS_WFORM_NO			10000
 #endif // __CONFIG_H__
