@@ -303,7 +303,16 @@ class SaveThread(Thread):
                                                       max_retries=5,
                                                       max_retry_delay=30_000,
                                                       exponential_base=2))
-            else:hk_list = None
+            else:
+                self.bucket = None
+                self.write_api = None
+
+            if HAS_INFLUX_DB_HK :
+                self.write_api_hk = self.client.write_api(write_options=SYNCHRONOUS)
+                self.bucketHk = INFLUX_DB_BUCKET_HK
+            else:
+                self.bucketHk = None
+                self.write_api_hk = None
 
         else:
             self.client = None
