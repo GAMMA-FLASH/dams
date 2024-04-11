@@ -7,6 +7,7 @@ import socket
 import time
 import math
 from threading import Thread
+from typing import List
 from queue import Queue, Full, Empty
 from time import sleep
 import tables as tb
@@ -272,16 +273,17 @@ class SaveThread(Thread):
         self.outdir = outdir
         self.dl2_dir = self.outdir.replace("DL0","DL2")
         self.wformno = wformno
-        self.event_list = []
+        self.event_list: List[Event] = []
         self.save_event = False
-        self.hk_list = []
+        self.hk_list: List[Hk] = []
         self.save_hk = True
-        self.wform_list = []
+        self.wform_list: List[Waveform] = []
         self.wform_count = 0
         self.running = True
         self._point = None
         self.spectrum_cfg = spectrum_cfg
         self.output_path = None
+        self.file_idx = 0
         if self.spectrum_cfg['Enable']:
             self.output_path = Path(self.spectrum_cfg['ProcessOut'])
             os.makedirs(self.output_path, exist_ok=True)
@@ -301,16 +303,7 @@ class SaveThread(Thread):
                                                       max_retries=5,
                                                       max_retry_delay=30_000,
                                                       exponential_base=2))
-            else:
-                self.bucket = None
-                self.write_api = None
-
-            if HAS_INFLUX_DB_HK :
-                self.write_api_hk = self.client.write_api(write_options=SYNCHRONOUS)
-                self.bucketHk = INFLUX_DB_BUCKET_HK
-            else:
-                self.bucketHk = None
-                self.write_api_hk = None
+            else:hk_list = None
 
         else:
             self.client = None
@@ -370,7 +363,7 @@ class SaveThread(Thread):
                 self.wform_list.append(packet)
                 self.wform_count += 1
 
-                if self.wform_count == self.wformno:
+                if self.wform_count == self.wformno :
 
                     filename = self.dump_packets()
                                         
@@ -431,8 +424,8 @@ class SaveThread(Thread):
         sns = math.modf(wf0.trx)
         usec = round(sns[0] * 1e6)
         str2 = '%06d' % usec
-        fname = '%s/wf_runId_%s_configId_%s_%s.%s' % (self.outdir, str(wf0.runID).zfill(5), str(wf0.configID).zfill(5), str1, str2)
-
+        fname = '%s/wf_runId_%s_file_%s_configId_%s_%s.%s' % (self.outdir, self.file_idx, str(wf0.runID).zfill(5), str(wf0.configID).zfill(5), str1, str2)
+        self.file_idx += 1
         print('Save file: ' + fname + '.h5')
 
         h5_out = tb.open_file(fname + '.h5', mode='w', title='dl0')
