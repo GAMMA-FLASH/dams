@@ -428,12 +428,11 @@ class SaveThread(Thread):
 
         # Create the file name using the rx time of the first waveform
         wf0 = self.wform_list[0]
-        ts = time.gmtime(wf0.trx)
-        str1 = time.strftime("%Y-%m-%dT%H_%M_%S", ts)
-        sns = math.modf(wf0.trx)
-        usec = round(sns[0] * 1e6)
+        current_time = time.time()
+        str1 = time.strftime("%Y-%m-%dT%H_%M_%S", time.gmtime(current_time))
+        usec = round((current_time - int(current_time)) * 1e6)
         str2 = '%06d' % usec
-        fname = '%s/wf_runId_%s_file_%s_configId_%s_%s.%s' % (self.outdir, self.file_idx, str(wf0.runID).zfill(5), str(wf0.configID).zfill(5), str1, str2)
+        fname = '%s/wf_runId_%s_file_%s_configId_%s_%s.%s' % (self.outdir, str(wf0.runID).zfill(5), str(self.file_idx).zfill(10), str(wf0.configID).zfill(5), str1, str2)
         self.file_idx += 1
         print('Save file: ' + fname + '.h5')
 
