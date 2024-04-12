@@ -16,7 +16,9 @@ if [ -z "$DAMS" ]; then
     echo "DAMS root not defined"
     exit 1
 fi
-mkdir -p $LOGDIR
+mkdir -p $DL0_LOGS
+
+cd $DAMS/dl0
 
 # Check if gfcl.ini exists
 if [ -e "gfcl.ini" ]; then
@@ -33,7 +35,6 @@ else
     PYTHON=python
 fi
 
-cd $DAMS/dl0
 export PYTHONUNBUFFERED=yes
 nohup $PYTHON $GFCL --addr 192.168.1.101 --port 1234 --outdir $ODIR/RPG101/35mV/ --wformno 1000 > $DL0_LOGS//gfcl_RP101.log &
 nohup $PYTHON $GFCL --addr 192.168.1.102 --port 1234 --outdir $ODIR/RPG102/35mV/ --wformno 1000 > $DL0_LOGS/gfcl_RP102.log &
