@@ -6,7 +6,7 @@ Test = no
 Enable_Counts = yes
 Enable_Hk = yes
 URL = 172.17.0.2:8086
-Token = 5Pm_cgEU-qGveYyjH_6cUIE9nDIXO1VkFe-GPWgGLymlagcqNWwYNTxegtJOy9XF68y96ImjFW6M4SaQGXiQGQ==
+Token = U-zc-DjhqfbbsnZ5gwCJimyfYB11TcSYQu6sI2DKDcXzLidH7M32lNYXVtZ7Z_Gl36m2zaCd00-yCB8C4S23pg==
 Org = GAMMA-FLASH
 Bucket = RP-COUNTS
 BucketHk = HK
