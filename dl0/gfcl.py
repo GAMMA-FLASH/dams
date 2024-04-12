@@ -14,6 +14,8 @@ import tables as tb
 import numpy as np
 import configparser
 import gc
+from enum import Enum
+
 from pathlib import Path
 
 from waveform import Waveform
@@ -41,6 +43,10 @@ INFLUX_DB_TOKEN = None
 INFLUX_DB_ORG = None
 INFLUX_DB_BUCKET = None
 INFLUX_DB_BUCKET_HK = None
+class TimestampOptions(Enum):
+    RedPitaya = 'RP'  # Use tstart from the waveform
+    MainComputer = 'MC'  # Sample the time from the main computer
+INFLUX_POINT_TIMESTAMP : TimestampOptions = TimestampOptions.MainComputer
 
 def trx_to_str(trx):
     ts = time.gmtime(trx)
@@ -285,8 +291,12 @@ class SaveThread(Thread):
         self.output_path = None
         self.file_idx = 0
         if self.spectrum_cfg['Enable']:
-            self.output_path = Path(self.spectrum_cfg['ProcessOut'])
-            os.makedirs(self.output_path, exist_ok=True)
+            try:
+                expanded_process_out_value = os.path.expandvars(self.spectrum_cfg['ProcessOut'])
+                self.output_path = Path(expanded_process_out_value)
+                os.makedirs(self.output_path, exist_ok=True)
+            except TypeError as e:
+                print("WARNING: DL2 output log folder not provided.")
         # ------------------------------------------------------------------ #
         # Setup influx DB                                                    #
         # ------------------------------------------------------------------ #
@@ -360,8 +370,12 @@ class SaveThread(Thread):
                 # ------------------------------------------------------------------ #
 
                 if HAS_INFLUX_DB_COUNTS:
-                    # time_ms = math.trunc((packet.tstart) * 1000)
-                    time_ms = math.trunc(time.time() * 1000)
+                
+
+                    if INFLUX_POINT_TIMESTAMP == TimestampOptions.RedPitaya: 
+                        time_ms = math.trunc((packet.tstart) * 1000) 
+                    else: 
+                        time_ms = math.trunc(time.time() * 1000) 
                     rpid = packet.rpID
                     if self._point is None:
                         self._point = Point("RPG%1d" % rpid).field("count", 1).time(time_ms, WritePrecision.MS)
@@ -409,11 +423,11 @@ class SaveThread(Thread):
         output_log = self.output_path.joinpath(f"{str(Path(filename).name)}.log")
         
         cmd=[
-            f"source {self.spectrum_cfg['Venv']}",
+            f"source activate {self.spectrum_cfg['Venv']}",
             f"python {self.spectrum_cfg['ProcessName']} -d /home/usergamma --outdir {self.dl2_dir} {self.spectrum_cfg['ProcessArgs']} --filename {inputfile} > {output_log} 2>&1"
         ]
         spectrum_cmd = " && ".join(cmd)
-        print("DEBUG - process command: ", spectrum_cmd)
+        #print("DEBUG - process command: ", spectrum_cmd)
 
         subprocess.Popen(spectrum_cmd, shell=True)
 
@@ -560,6 +574,11 @@ if __name__ == '__main__':
                 INFLUX_DB_BUCKET_HK = cfg['INFLUXDB'].get("BucketHk")
             else:
                 HAS_INFLUX_DB_HK = False
+            try:
+                INFLUX_POINT_TIMESTAMP = TimestampOptions(cfg['INFLUXDB'].get("Timestamp"))
+                print(f"Timestamp to load to influx set to: {INFLUX_POINT_TIMESTAMP}")
+            except ValueError as e:
+                print(f"WARNING: Cannot set 'INFLUX_POINT_TIMESTAMP': {e}. Using default {INFLUX_POINT_TIMESTAMP.value}")
         else:
             HAS_INFLUX_DB_HK = False
             HAS_INFLUX_DB_COUNTS = False
@@ -641,9 +660,3 @@ if __name__ == '__main__':
     save_thread.join()
 
     print('End')
-
-
-
-
-
-
