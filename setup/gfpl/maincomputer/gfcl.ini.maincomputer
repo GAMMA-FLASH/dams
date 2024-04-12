@@ -13,9 +13,9 @@ BucketHk = HK
 Timestamp = MC 
 
 [SPECTRUM_AN]
-Enable = no
-Venv = /opt/gflashenv/bin/activate
-ProcessName = eventlist_v4.py 
+Enable = yes
+Venv = gammaflash
+ProcessName = $DAMS/dl2/eventlist_v4.py 
 ProcessArgs = 
-ProcessOut = 
+ProcessOut = $DAMS/logs/dl2 
 
