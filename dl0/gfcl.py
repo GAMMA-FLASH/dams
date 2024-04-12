@@ -360,8 +360,8 @@ class SaveThread(Thread):
                 # ------------------------------------------------------------------ #
 
                 if HAS_INFLUX_DB_COUNTS:
-                    time_ms = math.trunc((packet.tstart - 3600) * 1000)
-                    # time_ms = math.trunc(time.time() * 1000)
+                    # time_ms = math.trunc((packet.tstart) * 1000)
+                    time_ms = math.trunc(time.time() * 1000)
                     rpid = packet.rpID
                     if self._point is None:
                         self._point = Point("RPG%1d" % rpid).field("count", 1).time(time_ms, WritePrecision.MS)
@@ -409,11 +409,11 @@ class SaveThread(Thread):
         output_log = self.output_path.joinpath(f"{str(Path(filename).name)}.log")
         
         cmd=[
-            f"source activate {self.spectrum_cfg['Venv']}",
+            f"source {self.spectrum_cfg['Venv']}",
             f"python {self.spectrum_cfg['ProcessName']} -d /home/usergamma --outdir {self.dl2_dir} {self.spectrum_cfg['ProcessArgs']} --filename {inputfile} > {output_log} 2>&1"
         ]
         spectrum_cmd = " && ".join(cmd)
-        #print("DEBUG - process command: ", spectrum_cmd)
+        print("DEBUG - process command: ", spectrum_cmd)
 
         subprocess.Popen(spectrum_cmd, shell=True)
 

@@ -4,7 +4,7 @@ DAMS_PATH=$(dirname $(dirname $(dirname "$(realpath "$0")")))
 
 bootstrap() {
     local target_host=$1
-    current_time=$(date "+%Y-%m-%d %H:%M:%S")
+    current_time=$(date -u "+%Y-%m-%d %H:%M:%S")
     ssh -tt $target_host << EOF
         date -s '$current_time' ;
         bash bootstrap2.sh ;
