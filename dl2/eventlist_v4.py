@@ -1,4 +1,5 @@
 import os
+import sys
 import glob
 import tables
 import argparse
@@ -346,7 +347,7 @@ class Eventlist:
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--directory', type=str, help="input directory", required=True)
+    parser.add_argument('-d', '--directory', type=str, help="input directory", required=False)
     parser.add_argument('-t', '--temperatures', type=str, help="temperature file", required=False)
     parser.add_argument('-f', '--filename', type=str, help="h5 DL0 filename", required=False)
     parser.add_argument('-o', '--outdir', type=str, help="output directory", required=True)
@@ -361,18 +362,22 @@ if __name__ == '__main__':
     else:
         temperatures = None
 
-    if args.filename is None:
+    if args.directory is not None:
         list_dir = glob.glob(f"{args.directory}/*.h5")
-
         if args.multiprocessing is None:
             for filename in list_dir:
-            	eventlist.process_file(filename, temperatures, args.outdir)
+                eventlist.process_file(filename, temperatures, args.outdir)
         #else:
-            #with Pool(args.multiprocessing) as p:
-                #p.map(eventlist.process_file, list_dir)
+        #with Pool(args.multiprocessing) as p:
+        #p.map(eventlist.process_file, list_dir)
 
-    else:
+    if args.filename is not None:
         eventlist.process_file(args.filename, temperatures, args.outdir)
 
     #with Pool(150) as p:
     #    p.map(process_file, list_dir)
+
+    if args.directory is None and args.filename is None:
+        print("No input directory or filename have been provided")
+
+        sys.exit(1)

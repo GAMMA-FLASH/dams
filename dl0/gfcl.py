@@ -424,7 +424,7 @@ class SaveThread(Thread):
         
         cmd=[
             f"source activate {self.spectrum_cfg['Venv']}",
-            f"python {self.spectrum_cfg['ProcessName']} -d /home/usergamma --outdir {self.dl2_dir} {self.spectrum_cfg['ProcessArgs']} --filename {inputfile} > {output_log} 2>&1"
+            f"python {self.spectrum_cfg['ProcessName']} --outdir {self.dl2_dir} {self.spectrum_cfg['ProcessArgs']} --filename {inputfile} > {output_log} 2>&1"
         ]
         spectrum_cmd = " && ".join(cmd)
         #print("DEBUG - process command: ", spectrum_cmd)
