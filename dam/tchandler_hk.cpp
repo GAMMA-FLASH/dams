@@ -43,6 +43,7 @@ int TcHandler::sendHk() {
             data->state = (uint8_t)g_systemInfo.state;
             data->flags = (uint8_t)g_systemInfo.flags;
             data->waveCount = g_systemInfo.totAcqWformCount;
+            clock_gettime(CLOCK_REALTIME, &data->ts);
     
             //data->encode();
             header->encode();
