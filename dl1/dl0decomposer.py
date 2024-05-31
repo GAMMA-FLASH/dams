@@ -87,7 +87,8 @@ class DL0Decomposer():
                         F_double = 1
         return peaks, peaks_idx, F_double
 
-    def __reset_time(self, start_index, end_index, n_event=0):
+    # def __reset_time(self, start_index, end_index, n_event=0):
+    def __reset_time(self, peak_first, current_peak, end_index):
         """
         This function reset the time and date attributes associated to each wf extracted from the window [start_index, end_index]
         ### Args
@@ -102,24 +103,31 @@ class DL0Decomposer():
             tdt = self.wfdl0.attrs['Dec'] * 8e-9
         else:
             tdt = 8e-9
-        # Extract trigger
-        curr_off = self.wfdl0.attrs['CurrentOffset'] + 1
-        trig_off = self.wfdl0.attrs['TriggerOffset']
-        # Compute tstart offset
-        if (curr_off > trig_off):
-            tstart_off = (len(self.wfdl0)-curr_off)+trig_off  
-        else: 
-            tstart_off = trig_off-curr_off
-        # Adapt the right parameters
-        if n_event == 0:
-            # If it is the first peak of the wf tstart remain the trigger time
-            tdelta = 0
-            tstart1 = tstart
-        else:
-            # Otherwise tstart corresponds to the peak time 
-            tdelta = (start_index-tstart_off) * tdt
-        tstart1 = tstart + tdelta
-        tend1  = tstart + (end_index-tstart_off) * tdt
+        # Compute tstart1 
+        # - Formula in eventlist_v4
+        #   current_tstart = ((self.__getPeaks(peaks, wf_start)[j] - original_pk0) * 8e-9) + original_tstart
+        # - Formula old
+        # # Extract trigger
+        # curr_off = self.wfdl0.attrs['CurrentOffset'] + 1
+        # trig_off = self.wfdl0.attrs['TriggerOffset']
+        # # Compute tstart offset
+        # if (curr_off > trig_off):
+        #     tstart_off = (len(self.wfdl0)-curr_off)+trig_off  
+        # else: 
+        #     tstart_off = trig_off-curr_off
+        # # Adapt the right parameters
+        # if n_event == 0:
+        #     # If it is the first peak of the wf tstart remain the trigger time
+        #     tdelta = 0
+        #     tstart1 = tstart
+        # else:
+        #     # Otherwise tstart corresponds to the peak time 
+        #     tdelta = (start_index-tstart_off) * tdt
+        # tstart1 = tstart + tdelta
+        deltat  = current_peak - peak_first
+        tstart1 = tstart + (deltat * tdt)
+        deltat  = end_index - peak_first
+        tend1   = tstart + (deltat * tdt)
         return tstart1, tend1
 
     def __attrstodict(self): # OK
@@ -186,7 +194,8 @@ class DL0Decomposer():
                 # Add zero pad to the right 
                 array_new = np.zeros(self.xlen)[:len(snapshot_arr)] + snapshot_arr
                 # Date and time reset attrs
-                tstart1, tend1 = self.__reset_time(start_index, end_index, n_event=pk_idx)
+                # tstart1, tend1 = self.__reset_time(start_index, end_index, n_event=pk_idx)
+                tstart1, tend1 = self.__reset_time(peaks[0], pk, end_index)
                 # Copy the old attributes and add new attributes
                 dl1attrs = self.__attrstodict() | {
                     'wf_size'     : end_index-start_index,

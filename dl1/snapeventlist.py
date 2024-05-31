@@ -34,8 +34,8 @@ class EventlistSnapshot():
    
     def __dl1Write(self, 
                    dl1path: str,
-                   nchunks=10):
-        chunkshape = (10, self.xlen)
+                   nchunks=8):
+        chunkshape = (nchunks, self.xlen)
         # There should be just one Group "/waveforms"
         model_waveformsGroup = self.model_root.find('Group')
         model_waveformsGroup_name  = model_waveformsGroup.get('name')
