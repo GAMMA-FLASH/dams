@@ -46,15 +46,23 @@ INFLUX_DB_BUCKET_HK = None
 class TimestampOptions(Enum):
     RedPitaya = 'RP'  # Use tstart from the waveform
     MainComputer = 'MC'  # Sample the time from the main computer
-INFLUX_POINT_TIMESTAMP : TimestampOptions = TimestampOptions.MainComputer
+INFLUX_WF_TIMESTAMP : TimestampOptions = TimestampOptions.MainComputer
+INFLUX_HK_TIMESTAMP : TimestampOptions = TimestampOptions.MainComputer
 
 def trx_to_str(trx):
     ts = time.gmtime(trx)
-    str1 = time.strftime("%Y%m%dT%H:%M:%S", ts)
+    str1 = time.strftime("[MC] %Y%m%d-%H:%M:%S", ts)
     sns = math.modf(trx)
     usec = round(sns[0] * 1e6)
     str2 = '%06d' % usec
-    return str1 + "." + str2
+    return "[MC]" + str1 + "." + str2
+
+def tmstp_to_str(tmstp):
+    ts = time.gmtime(tmstp[0])
+    str1 = time.strftime("%Y%m%d-%H:%M:%S", ts)
+    usec = round(tmstp[0] * 1e3)
+    str2 = '%06d' % usec
+    return "[RP]" + str1 + "." + str2
 
 print("gc enabled: ", gc.isenabled())
 class Event:
@@ -71,13 +79,12 @@ class Event:
 
 
 class Hk:
-    def __init__(self, rpId=None, trx=None):
+    def __init__(self, rpId=None):
         self.rpId = rpId
         # Receive time in secs past January 1, 1970, 00:00:00 (UTC)
-        if trx is None:
-            self.trx = time.time()
-        else:
-            self.trx = trx
+        
+        self.trx = time.time() #save instantiation time
+        self.tstmp = None
 
         self.state = 0
         self.flags = 0
@@ -91,16 +98,26 @@ class Hk:
         # [2] State (uint8) 0x02 = SERVICE 0x03 ACQUISITION
         # [3] Flags (uint8) 0x80 = PPS_NOK 0x40 = GPS_NOK 0x20 = TRIG_ERR (no events)
         # [4] WaveCount (uint32)
+        # [8] Timestamp (2*uint32)
         # Add temperature??
         self.state = struct.unpack('<B', raw[2:3])[0]
         self.flags = struct.unpack('<B', raw[3:4])[0]
-        self.wform_count = struct.unpack('<I', raw[4:])[0]
+        self.wform_count = struct.unpack('<I', raw[4:8])[0]
+        if len(raw) > 8:  ##for backward compatibility
+
+            self.tstmp = struct.unpack("<LL", raw[8:])  # timespec sec.nsec
+        
 
     def print(self):
         #print("    State: %02X" % self.state)
         #print("    Flags: %02X" % self.flags)
         #print("Wform no.: %d" % self.wform_count)
-        msg = trx_to_str(self.trx) + ' '
+        msg = ''
+        if self.tstmp is None:
+            msg = trx_to_str(self.trx)
+        else : 
+            msg = tmstp_to_str(self.tstmp)
+        msg += ' '
         if self.state == 0x02:
             msg += 'SRV'
         elif self.state == 0x03:
@@ -127,13 +144,19 @@ class Hk:
         #print("    Flags: %02X" % self.flags)
         #print("Wform no.: %d" % self.wform_count)
 
-        time_ms = math.trunc(self.trx * 1000)
         measurement_name = f"RPG{self.rpId}"
-        
+
         pps = 1 if self.flags & 0x80 else 0
         gps = 1 if self.flags & 0x40 else 0
         err = 1 if self.flags & 0x20 else 0
 
+        if INFLUX_HK_TIMESTAMP == TimestampOptions.MainComputer:
+            timepoint_influx = math.trunc(self.trx * 1000)
+            write_precision_influx=WritePrecision.MS
+        else:
+            timepoint_influx = self.tstmp[0]*1e6+self.tstmp[1]
+            write_precision_influx=WritePrecision.NS
+    
         self._point = (
             Point(measurement_name)
             .field("state", self.state)
@@ -141,7 +164,7 @@ class Hk:
             .field("GPS", gps)
             .field("ERR", err)
             .field("count", self.wform_count)
-            .time(time_ms, WritePrecision.MS)
+            .time(timepoint_influx, write_precision_influx)
         )
         
         write_api.write(bucket=bucket, org=org, record=self._point)        
@@ -250,7 +273,8 @@ class RecvThread(Thread):
 
     def decode_hk(self, header, payload):
         #print('Decode HK')
-        hk = Hk(self.rpId)
+        print(len(payload))
+        hk = Hk(rpId = self.rpId)
         hk.read_data(payload)
         try:
             self.queue.put(hk, timeout=5)
@@ -372,7 +396,7 @@ class SaveThread(Thread):
                 if HAS_INFLUX_DB_COUNTS:
                 
 
-                    if INFLUX_POINT_TIMESTAMP == TimestampOptions.RedPitaya: 
+                    if INFLUX_WF_TIMESTAMP == TimestampOptions.RedPitaya: 
                         time_ms = math.trunc((packet.tstart) * 1000) 
                     else: 
                         time_ms = math.trunc(time.time() * 1000) 
@@ -575,10 +599,12 @@ if __name__ == '__main__':
             else:
                 HAS_INFLUX_DB_HK = False
             try:
-                INFLUX_POINT_TIMESTAMP = TimestampOptions(cfg['INFLUXDB'].get("Timestamp"))
-                print(f"Timestamp to load to influx set to: {INFLUX_POINT_TIMESTAMP}")
+                INFLUX_WF_TIMESTAMP = TimestampOptions(cfg['INFLUXDB'].get("Timestamp_Wf"))
+                print(f"Timestamp to load to influx set to: {INFLUX_WF_TIMESTAMP}")
+                INFLUX_HK_TIMESTAMP = TimestampOptions(cfg['INFLUXDB'].get("Timestamp_Hk"))
+                print(f"Timestamp to load to influx set to: {INFLUX_HK_TIMESTAMP}")
             except ValueError as e:
-                print(f"WARNING: Cannot set 'INFLUX_POINT_TIMESTAMP': {e}. Using default {INFLUX_POINT_TIMESTAMP.value}")
+                print(f"WARNING: Cannot set 'TIMESTAMP' option: {e}. Using default value {TimestampOptions.MainComputer}")
         else:
             HAS_INFLUX_DB_HK = False
             HAS_INFLUX_DB_COUNTS = False
