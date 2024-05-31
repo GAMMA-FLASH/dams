@@ -14,10 +14,15 @@ bootstrap() {
 EOF
 }
 
-bootstrap 101 
-bootstrap 102
-bootstrap 103
-bootstrap 104
-bootstrap 105
-bootstrap 106
-
+if [ $# -eq 0 ]; then
+    for i in {101..106}; do
+        bootstrap $i
+    done
+else
+    if [[ $1 =~ ^10[1-6]$ ]]; then
+        bootstrap $1
+    else
+        echo "Invalid argument. Please provide a number between 101 and 106."
+        exit 1
+    fi
+fi

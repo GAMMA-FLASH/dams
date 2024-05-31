@@ -55,14 +55,14 @@ def trx_to_str(trx):
     sns = math.modf(trx)
     usec = round(sns[0] * 1e6)
     str2 = '%06d' % usec
-    return "[MC]" + str1 + "." + str2
+    return "[Hk - MC time]" + str1 + "." + str2
 
 def tmstp_to_str(tmstp):
     ts = time.gmtime(tmstp[0])
     str1 = time.strftime("%Y%m%d-%H:%M:%S", ts)
-    nsec = tmstp[0]
+    nsec = tmstp[1]
     str2 = '%06d' % nsec
-    return "[RP]" + str1 + "." + str2
+    return "[Hk - RP time]" + str1 + "." + str2
 
 print("gc enabled: ", gc.isenabled())
 class Event:
@@ -159,8 +159,11 @@ class Hk:
             timepoint_influx = math.trunc(self.trx * 1000)
             write_precision_influx=WritePrecision.MS
         else:
-            timepoint_influx = self.tstmp[0]*1e9+self.tstmp[1]
-            write_precision_influx=WritePrecision.US
+            print("inserintg data")
+            print("tstmp:", self.tstmp)
+            timepoint_influx = int(self.tstmp[0]*1e9+self.tstmp[1])
+            print("timeppoint:", timepoint_influx)
+            write_precision_influx=WritePrecision.NS
     
         self._point = (
             Point(measurement_name)

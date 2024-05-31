@@ -14,7 +14,7 @@ Timestamp_Wf = MC
 Timestamp_Hk = RP
 
 [SPECTRUM_AN]
-Enable = yes
+Enable = no
 Venv = gammaflash
 ProcessName = $DAMS/dl2/eventlist_v4.py 
 ProcessArgs = 
