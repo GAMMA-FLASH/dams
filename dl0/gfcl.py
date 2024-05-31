@@ -51,7 +51,7 @@ INFLUX_HK_TIMESTAMP : TimestampOptions = TimestampOptions.MainComputer
 
 def trx_to_str(trx):
     ts = time.gmtime(trx)
-    str1 = time.strftime("[MC] %Y%m%d-%H:%M:%S", ts)
+    str1 = time.strftime("%Y%m%d-%H:%M:%S", ts)
     sns = math.modf(trx)
     usec = round(sns[0] * 1e6)
     str2 = '%06d' % usec
@@ -60,8 +60,8 @@ def trx_to_str(trx):
 def tmstp_to_str(tmstp):
     ts = time.gmtime(tmstp[0])
     str1 = time.strftime("%Y%m%d-%H:%M:%S", ts)
-    usec = round(tmstp[0] * 1e3)
-    str2 = '%06d' % usec
+    nsec = tmstp[0]
+    str2 = '%06d' % nsec
     return "[RP]" + str1 + "." + str2
 
 print("gc enabled: ", gc.isenabled())
@@ -107,6 +107,11 @@ class Hk:
 
             self.tstmp = struct.unpack("<LL", raw[8:])  # timespec sec.nsec
         
+    def compute_time(self):
+        return float(self.tstmp[0]) + float(self.tstmp[1]) * 1e-9
+    
+    def timestamp_found(self):
+        return True if self.tstmp is not None else False
 
     def print(self):
         #print("    State: %02X" % self.state)
@@ -154,8 +159,8 @@ class Hk:
             timepoint_influx = math.trunc(self.trx * 1000)
             write_precision_influx=WritePrecision.MS
         else:
-            timepoint_influx = self.tstmp[0]*1e6+self.tstmp[1]
-            write_precision_influx=WritePrecision.NS
+            timepoint_influx = self.tstmp[0]*1e9+self.tstmp[1]
+            write_precision_influx=WritePrecision.US
     
         self._point = (
             Point(measurement_name)
@@ -517,6 +522,8 @@ class SaveThread(Thread):
                 arr._v_attrs.state = hk.state
                 arr._v_attrs.flags = hk.flags
                 arr._v_attrs.wform_count = hk.wform_count
+                if hk.timestamp_found():
+                    arr._v_attrs.time = hk.compute_time()
                 arr[:] = 0
 
         h5_out.close()
