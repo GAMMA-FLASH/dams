@@ -311,7 +311,8 @@ class EventlistDL0(EventlistGeneral):
                     # Wirte on files results
                     if len(peaks) == 1:
                         current_tstart = float(tstart)
-                        f.write(f"{i}\t{0}\t{tstart}\t{data[0]}\t{y[peaks[0]]}\t{integral}\t{integralMM}\t{integralExp}\t{rowsHalf[0]}\t{temp:.2f}\n")
+                        # f.write(f"{i}\t{0}\t{tstart}\t{data[0]}\t{y[peaks[0]]}\t{integral}\t{integralMM}\t{integralExp}\t{rowsHalf[0]}\t{temp:.2f}\n")
+                        f.write(f"{i}\t{0}\t{tstart}\t{peaks[0]}\t{y[peaks[0]]}\t{integral}\t{integralMM}\t{integralExp}\t{rowsHalf[0]}\t{temp:.2f}\n")
                         dl2_data.append([i, 0, current_tstart, peaks[0], y[peaks[0]], integral, integralMM, integralExp, rowsHalf[0],temp])
                     else:
                         current_tstart = float(((peaks[j] - peaks[0]) * 8e-9) + tstart)
