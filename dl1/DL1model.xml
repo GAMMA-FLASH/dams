@@ -35,14 +35,14 @@
                 <Attribute name="tend"/>           <!-- tend DLO waveform -->
                 <Attribute name="mmean1"/>         <!-- mean first 100 timesteps DLO waveform -->
                 <Attribute name="stdev1"/>         <!-- stdev first 100 timesteps DLO waveform -->
-            </Attributes>
-        </CArray>
-        <CArray name="attrs_float" dtype="float64" complevel="5" complib="gzip">
-            <Attributes>
                 <Attribute name="tstart1"/>        <!-- tstart recomputed for DL1 waveform -->
                 <Attribute name="tend1"/>          <!-- tend recomputed for DL1 waveform -->
             </Attributes>
         </CArray>
+        <!-- <CArray name="attrs_float" dtype="float64" complevel="5" complib="gzip">
+            <Attributes>
+            </Attributes>
+        </CArray> -->
         <CArray name="attrs_int" dtype="int64" complevel="5" complib="gzip">
             <Attributes>
                 <Attribute name="CurrentOffset"/>  <!-- It is the current offset of the DL0 circular buffer -->
