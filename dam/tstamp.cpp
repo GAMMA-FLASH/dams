@@ -152,6 +152,7 @@ static inline void gga_read() {
 							} 
 							else {
 								printf("not checking time\n");
+								g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_NOK);
 							}
 							
 						}
