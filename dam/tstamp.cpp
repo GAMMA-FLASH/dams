@@ -13,6 +13,8 @@
 
 #include "tstamp.h"
 
+#define TH_MINUTES 20
+
 static uint32_t m_status;
 
 static struct timespec m_pps_ts;
@@ -57,6 +59,7 @@ static inline int pps_wait() {
 			usleep(5);
 		}
 	}
+
 	return -1;
 }
 
@@ -68,9 +71,11 @@ void *ppsAcqThreadFcn(void *ptr) {
         int res = pps_wait();
         if (res == 0) { // PPS found wait till the next one
         	m_status &= ~(uint32_t)TimeStamp::TS_NOPPS;
+			g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_PPS_NOK);
         	usleep(750000);
         } else { // No signal/fix from PPS
         	m_status += (uint32_t)TimeStamp::TS_NOPPS;
+			g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_PPS_NOK);
         	sleep(1);
         }
 /*
@@ -91,6 +96,7 @@ static inline void gga_read() {
 
 	if (g_uart_nbytes < 17) {
 		return;
+		printf("No GGA data");
 	}
 	
 	if (g_uart_buff[0] == '$') {
@@ -121,6 +127,23 @@ static inline void gga_read() {
 								m_tstamp_ss = (uint32_t)(g_uart_buff[11]-'0')*10 + (uint32_t)(g_uart_buff[12]-'0');
 								m_tstamp_us = (uint32_t)(g_uart_buff[14]-'0')*100000 + (uint32_t)(g_uart_buff[15]-'0')*10000 + (uint32_t)(g_uart_buff[16]-'0');
 								
+								time_t rawtime;
+								struct tm *timeinfo;
+    							time(&rawtime);
+								timeinfo = localtime(&rawtime);
+								int current_hour = timeinfo->tm_hour;
+								int current_minute = timeinfo->tm_min;
+
+								// Compare parsed time with system time
+								int minute_difference = abs((m_tstamp_hh * 60 + m_tstamp_mm) - (current_hour * 60 + current_minute));
+								int threshold_minutes = TH_MINUTES;  // Set the threshold range of minutes
+								if (minute_difference > threshold_minutes) {
+									printf("Error: System time is not within %d minutes of GNGGA time.\n", threshold_minutes);
+									g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_NOK);
+								} else {
+									printf("System time is within %d minutes of GNGGA time.\n", threshold_minutes);
+									g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_NOK);
+								}
 
 								//printf("%02X %s\n", m_status, g_uart_buff);
 
@@ -150,9 +173,11 @@ void *ggaAcqThreadFcn(void *ptr) {
         int res = uart_read();
         if (res > 0) { // Search GGA sentence 
         	m_status &= ~(uint32_t)TimeStamp::TS_NOUART;
+			g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_NOK);
         	gga_read();
         } else {	// No data from UART
         	m_status += (uint32_t)TimeStamp::TS_NOUART;
+			g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_NOK);
         	sleep(1);
         }
     }
