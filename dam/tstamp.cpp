@@ -151,6 +151,9 @@ static inline void gga_read() {
 								pthread_mutex_unlock(&m_tstamp_lock);
 								
 							} 
+							else {
+								printf("not checking time");
+							}
 							
 						}
 					
