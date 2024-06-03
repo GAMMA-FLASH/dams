@@ -16,7 +16,7 @@
 	"manager_result_socket_type": ["pushpull"],
 	"manager_result_dataflow_type": ["string"],
 	"manager_result_socket": ["tcp://localhost:5559"],
-	"manager_num_workers": [1],
+	"manager_num_workers": [13],
 	"comment": "datasockettype=pushpull|pubsub dataflowtype=binary|filename|string processingtype=process|thread"
   },
   {
@@ -31,7 +31,7 @@
 	"manager_result_socket_type": ["pubsub"],
 	"manager_result_dataflow_type": ["string"],
 	"manager_result_socket": ["tcp://localhost:5553"],
-	"manager_num_workers": [4],
+	"manager_num_workers": [13],
 	"comment": "datasockettype=pushpull|pubsub dataflowtype=binary|filename|string processingtype=process|thread"
   },
   {
@@ -46,7 +46,7 @@
 	"manager_result_socket_type": ["pushpull"],
 	"manager_result_dataflow_type": ["string"],
 	"manager_result_socket": ["tcp://localhost:5559"],
-	"manager_num_workers": [2],
+	"manager_num_workers": [13],
 	"comment": "datasockettype=pushpull|pubsub dataflowtype=binary|filename|string processingtype=process|thread"
   },
   {
@@ -61,7 +61,7 @@
 	"manager_result_socket_type": ["none"],
 	"manager_result_dataflow_type": ["string"],
 	"manager_result_socket": ["none"],
-	"manager_num_workers": [1],
+	"manager_num_workers": [5],
 	"comment": "datasockettype=pushpull|pubsub dataflowtype=binary|filename|string processingtype=process|thread"
   }
 ]

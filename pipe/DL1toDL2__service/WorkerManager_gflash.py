@@ -1,6 +1,7 @@
 from WorkerManager import WorkerManager
-from DL1toDL2__service.WorkerThread_gflash import WorkerThread_DL1toDL2
-from DL1toDL2__service.WorkerProcess_gflash import WorkerProcess_DL1toDL2
+from WorkerProcess import WorkerProcess
+from WorkerThread import WorkerThread
+from DL1toDL2__service.WorkerProcessor_gflash import WorkerDL1toDL2
 
 class WorkerManager_DL1toDL2(WorkerManager):
 	def __init__(self, manager_id, supervisor, name = "dl1dl2_wm"):
@@ -10,7 +11,8 @@ class WorkerManager_DL1toDL2(WorkerManager):
 		super().start_worker_threads(num_threads)
 		#Worker threads
 		for i in range(num_threads):
-			thread = WorkerThread_DL1toDL2(i, self, "dl1dl2_thread")
+			processor = WorkerDL1toDL2()
+			thread = WorkerThread(i, self, "dl1dl2", processor)
 			self.worker_threads.append(thread)
 			thread.start()
 
@@ -18,7 +20,8 @@ class WorkerManager_DL1toDL2(WorkerManager):
 		super().start_worker_processes(num_processes)
 		# Worker processes
 		for i in range(num_processes):
-			process = WorkerProcess_DL1toDL2(i, self, self.processdata_shared, "dl1dl2_process")
+			processor = WorkerDL1toDL2()
+			process = WorkerProcess(i, self, "dl1dl2", processor)
 			self.worker_processes.append(process)
 			process.start()
 			
