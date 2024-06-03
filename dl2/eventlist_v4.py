@@ -1,4 +1,6 @@
 import os
+import sys
+sys.path.append('../dl1')
 import glob
 import tables
 import argparse
@@ -16,6 +18,8 @@ from multiprocessing import Pool
 from scipy.signal import find_peaks
 from tables.description import Float32Col
 from tables.description import Float64Col
+
+from dl1_utils import DL1UtilsAtts
 
 class GFTable(IsDescription):
     #N_Waveform\tmult\ttstart\tindex_peak\tpeak\tintegral1\tintegral2\tintegral3\thalflife\ttemp
@@ -325,6 +329,10 @@ class EventlistDL0(EventlistGeneral):
         f.close()
 
 class EventlistDL1(EventlistGeneral):
+    def __init__(self, xml_model_path: str) -> None:
+        super().__init__()
+        self.dl1attrs = DL1UtilsAtts(xml_model_path)
+
     def __getPeaks(self, peaks, wf_start):
         start_off = wf_start
         self.dl0_peaks = [pk + start_off for pk in peaks]
@@ -356,12 +364,12 @@ class EventlistDL1(EventlistGeneral):
         # Get dataset
         wfs = group["wfs"]
         # Get attributes for generate DL2
-        attrs_reco_int             = group["attrs_reco_int"]
-        attrs_reco_int_columns     = attrs_reco_int.attrs['column_names'].split(',')
-        attrs_reco_int__getValue   = lambda idx, attr: attrs_reco_int[idx, attrs_reco_int_columns.index(attr)]
-        attrs_reco_float           = group["attrs_reco_float"]
-        attrs_reco_float_columns   = attrs_reco_float.attrs['column_names'].split(',')
-        attrs_reco_float__getValue = lambda idx, attr: attrs_reco_float[idx, attrs_reco_float_columns.index(attr)]
+        # attrs_reco_int             = group["attrs_reco_int"]
+        # attrs_reco_int_columns     = attrs_reco_int.attrs['column_names'].split(',')
+        # attrs_reco_int__getValue   = lambda idx, attr: attrs_reco_int[idx, attrs_reco_int_columns.index(attr)]
+        # attrs_reco_float           = group["attrs_reco_float"]
+        # attrs_reco_float_columns   = attrs_reco_float.attrs['column_names'].split(',')
+        # attrs_reco_float__getValue = lambda idx, attr: attrs_reco_float[idx, attrs_reco_float_columns.index(attr)]
         tstarts = []
         header = f"N_Waveform\tmult\ttstart\tindex_peak\tpeak\tintegral1\tintegral2\tintegral3\thalflife\ttemp"
         f = open(f"{Path(basename).with_suffix('.dl2.txt')}", "w")
@@ -372,21 +380,21 @@ class EventlistDL1(EventlistGeneral):
         endEvent = endEvent if endEvent >= 0 else len(wfs) 
         # for i in tqdm(range(startEvent, endEvent, 1)):
         for i in tqdm(range(len(wfs))):
-            original_wf     = attrs_reco_int__getValue(i, 'original_wf')
+            original_wf     = self.dl1attrs.get_attr(h5file, i, 'original_wf')
             if original_wf < int(startEvent):
                 continue
             if endEvent > 0:
                 if original_wf > int(endEvent):
                     break
-            lenwf           = attrs_reco_int__getValue(i, 'wf_size')
-            wf_start        = attrs_reco_int__getValue(i, 'wf_start')
-            isdoubleEvent   = attrs_reco_int__getValue(i, 'isdouble')
-            dec             = attrs_reco_int__getValue(i, 'Dec')
+            lenwf           = self.dl1attrs.get_attr(h5file, i, 'wf_size')
+            wf_start        = self.dl1attrs.get_attr(h5file, i, 'wf_start')
+            isdoubleEvent   = self.dl1attrs.get_attr(h5file, i, 'isdouble')
+            dec             = self.dl1attrs.get_attr(h5file, i, 'Dec')
             data  = wfs[i, :lenwf]
             # Get tstart
-            tstart          = attrs_reco_float__getValue(i, 'tstart')
-            mmean1          = attrs_reco_float__getValue(i, 'mmean1')
-            stdev1          = attrs_reco_float__getValue(i, 'stdev1')
+            tstart          = self.dl1attrs.get_attr(h5file, i, 'tstart')
+            mmean1          = self.dl1attrs.get_attr(h5file, i, 'mmean1')
+            stdev1          = self.dl1attrs.get_attr(h5file, i, 'stdev1')
             # Get maximum value of wf
             val = np.max(data)
             y = data
@@ -397,7 +405,7 @@ class EventlistDL1(EventlistGeneral):
             arr = y.copy()
             # Compute moving average
             arrmov = self.moving_average(arr, 15)
-            if attrs_reco_int__getValue(i, 'n_peaks') == 0:
+            if self.dl1attrs.get_attr(h5file, i, 'n_peaks') == 0:
                 # If in DL1 we didn't find any peak the list should be empty
                 peaks = []
             elif isdoubleEvent:
@@ -405,7 +413,7 @@ class EventlistDL1(EventlistGeneral):
                 peaks, _ = find_peaks(arrmov, height=mmean1*2* 0.9, width=15, distance=25)
             else:
                 # If it is a single event event 
-                peaks  = [attrs_reco_int__getValue(i, 'peak_pos') - wf_start]
+                peaks  = [self.dl1attrs.get_attr(h5file, i, 'peak_pos') - wf_start]
             deltav = 20
             peaks2 = np.copy(peaks)
             for v in peaks2:
@@ -525,14 +533,14 @@ class EventlistDL1(EventlistGeneral):
                     # Get temperatures
                     temp = float(self.get_temperature(tstart))
                     # Wirte on files results
-                    original_tstart = attrs_reco_float__getValue(i, 'tstart')
-                    original_pk0    = attrs_reco_int__getValue(i, 'pk0_pos')
-                    n_peaks         = attrs_reco_int__getValue(i, 'n_peaks')
-                    peak_idx        = attrs_reco_int__getValue(i, 'peak_idx')
+                    original_tstart = self.dl1attrs.get_attr(h5file, i, 'tstart')
+                    original_pk0    = self.dl1attrs.get_attr(h5file, i, 'pk0_pos')
+                    n_peaks         = self.dl1attrs.get_attr(h5file, i, 'n_peaks')
+                    peak_idx        = self.dl1attrs.get_attr(h5file, i, 'peak_idx')
                     if isdoubleEvent:
                         current_tstart = ((self.__getPeaks(peaks, wf_start)[j] - original_pk0) * dec * 8e-9) + original_tstart
                     else:
-                        current_tstart  = float(attrs_reco_float__getValue(i, 'tstart1'))
+                        current_tstart  = float(self.dl1attrs.get_attr(h5file, i, 'tstart1'))
                     #
                     f.write(f"{original_wf}\t{self.__getPKindex(j, n_peaks, peak_idx)}\t{current_tstart}\t{self.__getPeaks(peaks, wf_start)[j]}\t{y[peaks[j]]}\t{integral}\t{integralMM}\t{integralExp}\t{rowsHalf[0]}\t{temp:.2f}\n")
                     dl2_data.append([original_wf, self.__getPKindex(j, n_peaks, peak_idx), current_tstart, self.__getPeaks(peaks, wf_start)[j], y[peaks[j]], integral, integralMM, integralExp, rowsHalf[0], temp])
@@ -543,12 +551,14 @@ class EventlistDL1(EventlistGeneral):
 
 
 class Eventlist:
-    def __init__(self, from_dl1=False) -> None:
+    def __init__(self, 
+                 from_dl1: bool = False,
+                 xml_model_path: str = 'none') -> None:
         self.from_dl1=from_dl1
         if not self.from_dl1:
             self.evntlist = EventlistDL0()
         else:
-            self.evntlist = EventlistDL1()
+            self.evntlist = EventlistDL1(xml_model_path)
 
     def moving_average(self, x, w):
         self.evntlist.moving_average(x, w)
