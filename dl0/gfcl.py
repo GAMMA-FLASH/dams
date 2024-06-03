@@ -134,10 +134,18 @@ class Hk:
         else:
             msg += ' _'
         if self.flags & 0x40:
-            msg += 'G'
+            msg += 'Gu'
         else:
-            msg += '_'
+            msg += '__'
         if self.flags & 0x20:
+            msg += 'Go'
+        else:
+            msg += '__'
+        if self.flags & 0x10:
+            msg += 'Gt'
+        else:
+            msg += '__'
+        if self.flags & 0x01:
             msg += 'T'
         else:
             msg += '_'
@@ -152,8 +160,10 @@ class Hk:
         measurement_name = f"RPG{self.rpId}"
 
         pps = 1 if self.flags & 0x80 else 0
-        gps = 1 if self.flags & 0x40 else 0
-        err = 1 if self.flags & 0x20 else 0
+        gps_no_uart = 1 if self.flags & 0x40 else 0
+        gps_overtime = 1 if self.flags & 0x20 else 0
+        gps_invalid_time = 1 if self.flags & 0x10 else 0
+        err = 1 if self.flags & 0x10 else 0
 
         if INFLUX_HK_TIMESTAMP == TimestampOptions.MainComputer:
             timepoint_influx = math.trunc(self.trx * 1000)
@@ -167,8 +177,10 @@ class Hk:
         self._point = (
             Point(measurement_name)
             .field("state", self.state)
-            .field("PPS", pps)
-            .field("GPS", gps)
+            .field("PPS_NOK", pps)
+            .field("GPS_UART_NOK", gps_no_uart)
+            .field("GPS_OVERTIME", gps_overtime)
+            .field("GPS_TIME_NOK", gps_invalid_time)
             .field("ERR", err)
             .field("count", self.wform_count)
             .time(timepoint_influx, write_precision_influx)

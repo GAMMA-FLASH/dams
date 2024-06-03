@@ -24,9 +24,11 @@ public:
     };
     
     enum Flags {
-        FLG_PPS_NOK         = 0x80,
-        FLG_GPS_NOK         = 0x40,
-        FLG_TRG_ERR			= 0x20
+        FLG_PPS_NOK         = 0x80, // pps not received
+        FLG_GPS_NOUART      = 0x40, // no signal from serial
+        FLG_GPS_OVERTIME      = 0x20, // time between PPS and GGA is more than 1 second
+        FLG_GPS_NOTIME      = 0x10, // invalid time wrt red pitaya time 
+        FLG_TRG_ERR			= 0x01
     };
     
     uint32_t state;

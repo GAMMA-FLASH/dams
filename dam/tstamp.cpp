@@ -116,6 +116,7 @@ static inline void gga_read() {
             				
             				if (dnsec < 1000000000) {
 								
+								g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_OVERTIME);
 								pthread_mutex_lock(&m_tstamp_lock);
 
 								m_tstamp_ts.tv_sec = m_pps_ts.tv_sec;
@@ -139,10 +140,10 @@ static inline void gga_read() {
 								
 								if (abs(minute_difference) > threshold_minutes) {
 									printf("Error: System time is not within %d minutes of GNGGA time: current %d:%d ; gps %d:%d\n", threshold_minutes, current_hour, current_minute, m_tstamp_hh, m_tstamp_mm );
-									g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_NOK);
+									g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_NOTIME);
 								} else {
 									printf("System time is within %d minutes of GNGGA time. difference %d min\n", threshold_minutes, minute_difference);
-									g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_NOK);
+									g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_NOTIME);
 								}
 
 								//printf("%02X %s\n", m_status, g_uart_buff);
@@ -152,7 +153,7 @@ static inline void gga_read() {
 							} 
 							else {
 								printf("not checking time\n");
-								g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_NOK);
+								g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_OVERTIME);
 							}
 							
 						}
@@ -177,9 +178,11 @@ void *ggaAcqThreadFcn(void *ptr) {
         int res = uart_read();
         if (res > 0) { // Search GGA sentence 
         	m_status &= ~(uint32_t)TimeStamp::TS_NOUART;
+			g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_NOUART);
         	gga_read();
         } else {	// No data from UART
         	m_status += (uint32_t)TimeStamp::TS_NOUART;
+			g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_NOUART);
         	sleep(1);
         }
     }
