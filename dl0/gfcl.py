@@ -159,10 +159,9 @@ class Hk:
             timepoint_influx = math.trunc(self.trx * 1000)
             write_precision_influx=WritePrecision.MS
         else:
-            print("inserintg data")
-            print("tstmp:", self.tstmp)
+            # print("inserintg data")
+
             timepoint_influx = int(self.tstmp[0]*1e9+self.tstmp[1])
-            print("timeppoint:", timepoint_influx)
             write_precision_influx=WritePrecision.NS
     
         self._point = (
