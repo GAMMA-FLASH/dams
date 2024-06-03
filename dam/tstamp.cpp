@@ -76,7 +76,7 @@ void *ppsAcqThreadFcn(void *ptr) {
         } else { // No signal/fix from PPS
         	m_status += (uint32_t)TimeStamp::TS_NOPPS;
 			g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_PPS_NOK);
-			printf("PPS not received");
+			printf("PPS not received\n");
         	sleep(1);
         }
 /*
