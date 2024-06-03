@@ -95,8 +95,8 @@ void *ppsAcqThreadFcn(void *ptr) {
 static inline void gga_read() {
 
 	if (g_uart_nbytes < 17) {
-		return;
 		printf("No GGA data");
+		return;
 	}
 	
 	if (g_uart_buff[0] == '$') {
