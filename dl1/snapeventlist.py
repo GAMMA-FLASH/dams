@@ -54,7 +54,6 @@ class EventlistSnapshot():
             for model_CArray in model_CArrayList:
                 # Get the definition attributes of the current CArray
                 model_CArray_name      = model_CArray.get('name')
-                print(model_CArray_name)
                 model_CArray_dtype     = model_CArray.get('dtype')
                 model_CArray_complevel = int(model_CArray.get('complevel'))
                 model_CArray_complib   = model_CArray.get('complib')
@@ -103,13 +102,15 @@ class EventlistSnapshot():
                 # Store column names as a single attribute
                 dataset.attrs['column_names'] = ','.join(column_names)
     
-    def process_file(self, filename, outdir, startEvent=0, endEvent=-1):
+    def process_file(self, filename, outdir, startEvent=0, endEvent=-1, pbar_show=True):
+        print('Processing', filename)
         # Create the name of the new file of output of type dl1 
         dl1_path = os.path.join(outdir, os.path.basename(filename).replace('.h5', '.dl1.h5'))
         # Open the source file in read mode
         with h5py.File(filename, mode='r') as h5_in:
             wfdl0List = h5_in["/waveforms"]
             for i, wfdl0name in tqdm(enumerate(wfdl0List),
+                                     disable=not pbar_show,
                                      total=len(wfdl0List)):
                 if i < int(startEvent):
                     continue

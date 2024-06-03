@@ -142,7 +142,7 @@ class EventlistGeneral:
             print(f"La directory '{directory_path}' è stata creata.")
 
 class EventlistDL0(EventlistGeneral):
-    def process_file(self, filename, temperatures, outdir, log = False, startEvent=0, endEvent=-1):
+    def process_file(self, filename, temperatures, outdir, log = False, startEvent=0, endEvent=-1, pbar_show=False):
         print("Processing " + filename)
         self.create_directory(outdir)
         basename = Path(outdir, os.path.basename(filename))
@@ -162,7 +162,8 @@ class EventlistDL0(EventlistGeneral):
         
         shape_data = -1
         lenwf = -1
-        for i, data in tqdm(enumerate(group), total=endEvent+1 if endEvent > 0 else group._g_getnchildren()):
+        for i, data in tqdm(enumerate(group), disable=not pbar_show, 
+                            total=endEvent+1 if endEvent > 0 else group._g_getnchildren()):
             if i < int(startEvent):
                 continue
             if endEvent > 0:
@@ -348,7 +349,7 @@ class EventlistDL1(EventlistGeneral):
             # NOTE: in DL0 wf with more than a PK get a +1
             return peak_idx + j + 1
 
-    def process_file(self, filename, temperatures, outdir, log = False, startEvent=0, endEvent=-1):
+    def process_file(self, filename, temperatures, outdir, log = False, startEvent=0, endEvent=-1, pbar_show=False):
         print("Processing " + filename)
         self.create_directory(outdir)
         basename = Path(outdir, os.path.basename(filename))
@@ -363,23 +364,14 @@ class EventlistDL1(EventlistGeneral):
         group = h5file["/waveforms"]
         # Get dataset
         wfs = group["wfs"]
-        # Get attributes for generate DL2
-        # attrs_reco_int             = group["attrs_reco_int"]
-        # attrs_reco_int_columns     = attrs_reco_int.attrs['column_names'].split(',')
-        # attrs_reco_int__getValue   = lambda idx, attr: attrs_reco_int[idx, attrs_reco_int_columns.index(attr)]
-        # attrs_reco_float           = group["attrs_reco_float"]
-        # attrs_reco_float_columns   = attrs_reco_float.attrs['column_names'].split(',')
-        # attrs_reco_float__getValue = lambda idx, attr: attrs_reco_float[idx, attrs_reco_float_columns.index(attr)]
-        tstarts = []
         header = f"N_Waveform\tmult\ttstart\tindex_peak\tpeak\tintegral1\tintegral2\tintegral3\thalflife\ttemp"
         f = open(f"{Path(basename).with_suffix('.dl2.txt')}", "w")
         f.write(f"{header}\n")
         dl2_data = []
 
         # readapt endEvent
-        endEvent = endEvent if endEvent >= 0 else len(wfs) 
-        # for i in tqdm(range(startEvent, endEvent, 1)):
-        for i in tqdm(range(len(wfs))):
+        endEvent = endEvent if endEvent >= 0 else len(wfs)
+        for i in tqdm(range(len(wfs)), disable=not pbar_show):
             original_wf     = self.dl1attrs.get_attr(h5file, i, 'original_wf')
             if original_wf < int(startEvent):
                 continue
@@ -578,8 +570,8 @@ class Eventlist:
     def create_directory(self, directory_path):
         self.evntlist.create_directory(directory_path)
 
-    def process_file(self, filename, temperatures, outdir, log=False, startEvent=0, endEvent=-1):
-        self.evntlist.process_file(filename, temperatures, outdir, log=log, startEvent=startEvent, endEvent=endEvent)
+    def process_file(self, filename, temperatures, outdir, log=False, startEvent=0, endEvent=-1, pbar_show=False):
+        self.evntlist.process_file(filename, temperatures, outdir, log=log, startEvent=startEvent, endEvent=endEvent, pbar_show=pbar_show)
 
 
 if __name__ == '__main__':
