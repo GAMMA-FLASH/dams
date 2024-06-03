@@ -137,12 +137,13 @@ static inline void gga_read() {
 								// Compare parsed time with system time
 								int minute_difference = (m_tstamp_hh * 60 + m_tstamp_mm) - (current_hour * 60 + current_minute);
 								int threshold_minutes = TH_MINUTES;  // Set the threshold range of minutes
+								printf("checking time");
 								if (abs(minute_difference) > threshold_minutes) {
 									printf("Error: System time is not within %d minutes of GNGGA time: current %d:%d ; gps %d:%d\n", threshold_minutes, current_hour, current_minute, m_tstamp_hh, m_tstamp_mm );
-									g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_NOK);
+									g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_NOK);
 								} else {
 									printf("System time is within %d minutes of GNGGA time. difference %d min", threshold_minutes, minute_difference);
-									g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_NOK);
+									g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_NOK);
 								}
 
 								//printf("%02X %s\n", m_status, g_uart_buff);
