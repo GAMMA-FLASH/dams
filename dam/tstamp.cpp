@@ -176,11 +176,9 @@ void *ggaAcqThreadFcn(void *ptr) {
         int res = uart_read();
         if (res > 0) { // Search GGA sentence 
         	m_status &= ~(uint32_t)TimeStamp::TS_NOUART;
-			g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_NOK);
         	gga_read();
         } else {	// No data from UART
         	m_status += (uint32_t)TimeStamp::TS_NOUART;
-			g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_NOK);
         	sleep(1);
         }
     }
