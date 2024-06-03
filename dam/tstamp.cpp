@@ -51,15 +51,18 @@ static inline void delta_time(const struct timespec *t1, const struct timespec *
 }
 
 static inline int pps_wait() {
+	int count = 0;
 	for(int i = 0; i < 500000; i++) {
 		if (g_hk_fpga_reg_mem->in_p & HK_FPGA_GPIO_BIT7) {
 			clock_gettime(CLOCK_REALTIME, &m_pps_ts);
+			printf("value of PPS checked: %d times\n", count);
 			return 0;
 		} else {
+			count++;
 			usleep(5);
 		}
 	}
-
+	printf("value of PPS checked: %d times\n", count);
 	return -1;
 }
 
@@ -72,6 +75,7 @@ void *ppsAcqThreadFcn(void *ptr) {
         if (res == 0) { // PPS found wait till the next one
         	m_status &= ~(uint32_t)TimeStamp::TS_NOPPS;
 			g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_PPS_NOK);
+			printf("PPS received\n");
         	usleep(750000);
         } else { // No signal/fix from PPS
         	m_status += (uint32_t)TimeStamp::TS_NOPPS;
