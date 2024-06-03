@@ -41,6 +41,7 @@ class EventlistSnapshot():
         model_waveformsGroup_name  = model_waveformsGroup.get('name')
         # Compute the number of waveforms
         num_waveforms = self.dl1wflist.len()
+        nchunks = min(num_waveforms, nchunks)
         # Get from the xml model the list of 
         model_CArrayList = model_waveformsGroup.findall('CArray')
         # Get the data and the set of new attributes
@@ -110,7 +111,13 @@ class EventlistSnapshot():
             wfdl0List = h5_in["/waveforms"]
             for i, wfdl0name in tqdm(enumerate(wfdl0List),
                                      total=len(wfdl0List)):
+                if i < int(startEvent):
+                    continue
+                if endEvent > 0:
+                    if i > int(endEvent):
+                        break
                 self.__decomposeWF(wfdl0List[wfdl0name], 
                                    wfdl0name, 
                                    i)
+        nchunks = min(endEvent-startEvent, 8)
         self.__dl1Write(dl1_path)

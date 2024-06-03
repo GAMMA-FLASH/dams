@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from time import time
 from tables import *
+import h5py
 from pathlib import Path
 from tqdm import tqdm
 import traceback
@@ -315,7 +316,7 @@ class EventlistDL0(EventlistGeneral):
                         f.write(f"{i}\t{0}\t{tstart}\t{peaks[0]}\t{y[peaks[0]]}\t{integral}\t{integralMM}\t{integralExp}\t{rowsHalf[0]}\t{temp:.2f}\n")
                         dl2_data.append([i, 0, current_tstart, peaks[0], y[peaks[0]], integral, integralMM, integralExp, rowsHalf[0],temp])
                     else:
-                        current_tstart = float(((peaks[j] - peaks[0]) * 8e-9) + tstart)
+                        current_tstart = float(((peaks[j] - peaks[0]) * data._v_attrs.Dec * 8e-9) + tstart)
                         f.write(f"{i}\t{j+1}\t{current_tstart}\t{peaks[j]}\t{y[peaks[j]]}\t{integral}\t{integralMM}\t{integralExp}\t{rowsHalf[0]}\t{temp:.2f}\n")
                         dl2_data.append([i, j+1, current_tstart, peaks[j], y[peaks[j]], integral, integralMM, integralExp, rowsHalf[0],temp])
                     j = j + 1
@@ -324,23 +325,20 @@ class EventlistDL0(EventlistGeneral):
         f.close()
 
 class EventlistDL1(EventlistGeneral):
-    def __getPeaks(self, peaks, data):
-        start_off = data._v_attrs.wf_start
+    def __getPeaks(self, peaks, wf_start):
+        start_off = wf_start
         self.dl0_peaks = [pk + start_off for pk in peaks]
         return self.dl0_peaks
     
-    def __getXrange(self, data):
-        return np.arange(data._v_attrs.wf_start, data._v_attrs.wf_size + data._v_attrs.wf_start)
+    def __getXrange(self, wf_start, wf_size):
+        return np.arange(wf_start, wf_size + wf_start)
 
-    def __getWFindex(self, data):
-        return int(data._v_attrs.original_wf.split('_')[1])
-
-    def __getPKindex(self, j, data):
-        if data._v_attrs.n_peaks == 1:
+    def __getPKindex(self, j, n_peaks, peak_idx):
+        if n_peaks == 1:
             return 0
         else:
             # NOTE: in DL0 wf with more than a PK get a +1
-            return data._v_attrs.peak_idx + j + 1
+            return peak_idx + j + 1
 
     def process_file(self, filename, temperatures, outdir, log = False, startEvent=0, endEvent=-1):
         print("Processing " + filename)
@@ -352,57 +350,62 @@ class EventlistDL1(EventlistGeneral):
         if os.path.exists(outputfilename):
             return
         # Open h5file
-        h5file = open_file(filename, mode="r")
+        h5file = h5py.File(filename, mode='r')
         self.temperatures = temperatures
-        group = h5file.get_node("/waveforms")
+        group = h5file["/waveforms"]
+        # Get dataset
+        wfs = group["wfs"]
+        # Get attributes for generate DL2
+        attrs_reco_int             = group["attrs_reco_int"]
+        attrs_reco_int_columns     = attrs_reco_int.attrs['column_names'].split(',')
+        attrs_reco_int__getValue   = lambda idx, attr: attrs_reco_int[idx, attrs_reco_int_columns.index(attr)]
+        attrs_reco_float           = group["attrs_reco_float"]
+        attrs_reco_float_columns   = attrs_reco_float.attrs['column_names'].split(',')
+        attrs_reco_float__getValue = lambda idx, attr: attrs_reco_float[idx, attrs_reco_float_columns.index(attr)]
         tstarts = []
         header = f"N_Waveform\tmult\ttstart\tindex_peak\tpeak\tintegral1\tintegral2\tintegral3\thalflife\ttemp"
         f = open(f"{Path(basename).with_suffix('.dl2.txt')}", "w")
         f.write(f"{header}\n")
         dl2_data = []
 
-        shape_data = -1
-        lenwf = -1
-        for i, data in tqdm(enumerate(group), total=endEvent+1 if endEvent > 0 else group._g_getnchildren()):
-            if i < int(startEvent):
+        # readapt endEvent
+        endEvent = endEvent if endEvent >= 0 else len(wfs) 
+        # for i in tqdm(range(startEvent, endEvent, 1)):
+        for i in tqdm(range(len(wfs))):
+            original_wf     = attrs_reco_int__getValue(i, 'original_wf')
+            if original_wf < int(startEvent):
                 continue
             if endEvent > 0:
-                if i > int(endEvent):
+                if original_wf > int(endEvent):
                     break
-            if shape_data < 0:
-                if data._v_attrs.VERSION == "3.1.1":
-                    shape_data = 1
-                elif data._v_attrs.VERSION == "3.2.0":
-                    shape_data = 0
-            lenwf = len(data[:,shape_data])
+            lenwf           = attrs_reco_int__getValue(i, 'wf_size')
+            wf_start        = attrs_reco_int__getValue(i, 'wf_start')
+            isdoubleEvent   = attrs_reco_int__getValue(i, 'isdouble')
+            dec             = attrs_reco_int__getValue(i, 'Dec')
+            data  = wfs[i, :lenwf]
             # Get tstart
-            tstart = data._v_attrs.tstart
+            tstart          = attrs_reco_float__getValue(i, 'tstart')
+            mmean1          = attrs_reco_float__getValue(i, 'mmean1')
+            stdev1          = attrs_reco_float__getValue(i, 'stdev1')
             # Get maximum value of wf
-            val = np.max(data[:,shape_data])
+            val = np.max(data)
+            y = data
             if val > 8192:
-                y = np.array(data[:,shape_data].shape)     
-                for i, val in enumerate(data[:,shape_data]):
-                    y[i] = Eventlist.twos_comp_to_int(val)
-            else:
-                y = data[:,shape_data]
+                for t, val in enumerate(data):
+                    y[t] = Eventlist.twos_comp_to_int(val)
             # Deep copy of y array 
             arr = y.copy()
             # Compute moving average
             arrmov = self.moving_average(arr, 15)
-            # Get metadata of wf and its peaks
-            if log == True:
-                print("recupero mean value and stdev")
-            mmean1 = data._v_attrs.mmean1
-            stdev1 = data._v_attrs.stdev1
-            if data._v_attrs.n_peaks == 0:
+            if attrs_reco_int__getValue(i, 'n_peaks') == 0:
                 # If in DL1 we didn't find any peak the list should be empty
                 peaks = []
-            elif not data._v_attrs.isdouble:
-                # If it is a single event event 
-                peaks  = [data._v_attrs.peak_pos - data._v_attrs.wf_start]
-            else:
+            elif isdoubleEvent:
                 # If it is a double event
                 peaks, _ = find_peaks(arrmov, height=mmean1*2* 0.9, width=15, distance=25)
+            else:
+                # If it is a single event event 
+                peaks  = [attrs_reco_int__getValue(i, 'peak_pos') - wf_start]
             deltav = 20
             peaks2 = np.copy(peaks)
             for v in peaks2:
@@ -422,16 +425,16 @@ class EventlistDL1(EventlistGeneral):
                         plt.show()
                     peaks = peaks[peaks != v]
             if log == True:
-                print(f"Waveform num. {i} ##############################")
-                print(f"la waveform num. {i} ha i seguenti peaks: {self.__getPeaks(peaks, data)} e mean value {mmean1} and stdev {stdev1}")
-
+                print(f"Waveform num. {original_wf} ##############################")
+                print(f"la waveform num. {original_wf} ha i seguenti peaks: {self.__getPeaks(peaks, wf_start)} e mean value {mmean1} and stdev {stdev1}")
+            
             if len(peaks) == 0:
                 current_tstart = tstart
                 temp = self.get_temperature(tstart)
-                f.write(f"{self.__getWFindex(data)}\t{0}\t{tstart}\t{-1}\t{-1}\t{-1}\t{-1}\t{-1}\t{-1}\t{temp:.2f}\n")
-                dl2_data.append([self.__getWFindex(data), 0, tstart, -1, -1, -1, -1, -1, -1, temp])
+                f.write(f"{original_wf}\t{0}\t{tstart}\t{-1}\t{-1}\t{-1}\t{-1}\t{-1}\t{-1}\t{temp:.2f}\n")
+                dl2_data.append([original_wf, 0, tstart, -1, -1, -1, -1, -1, -1, temp])
                 if log == True:
-                    print(f"{i}\tEMPTY")
+                    print(f"{original_wf}\tEMPTY")
                     plt.figure()
                     plt.plot(range(len(arr)),arr, color='g')
                     plt.plot(range(len(arrmov)),arrmov)
@@ -494,10 +497,10 @@ class EventlistDL1(EventlistGeneral):
                         if log == True:
                             if j == 0:
                                 plt.figure()
-                                xr_arr = self.__getXrange(data)
+                                xr_arr = self.__getXrange(wf_start, lenwf)
                                 plt.plot(xr_arr, arr, color='g', label='arr')
                                 plt.plot(xr_arr[:len(arrmov)], arrmov, label='arrmov')
-                                for v in self.__getPeaks(peaks, data):
+                                for v in self.__getPeaks(peaks, wf_start):
                                     plt.axvline(x = v, color = 'r', label='peaks')
                                 plt.legend()
                                 plt.show()
@@ -516,17 +519,23 @@ class EventlistDL1(EventlistGeneral):
                             plt.legend()
                             plt.show()
                     except Exception as e:
-                        print(f"EXCEPTION: Peaks non trovati nella waveform {i} del file {filename}")
+                        print(f"EXCEPTION: Peaks non trovati nella waveform {original_wf} del file {filename}")
                         traceback.print_exception(e)
                         continue
                     # Get temperatures
                     temp = float(self.get_temperature(tstart))
                     # Wirte on files results
-                    original_tstart = data._v_attrs.pk0_tstart
-                    original_pk0    = data._v_attrs.pk0_pos
-                    current_tstart = ((self.__getPeaks(peaks, data)[j] - original_pk0) * 8e-9) + original_tstart
-                    f.write(f"{self.__getWFindex(data)}\t{self.__getPKindex(j, data)}\t{current_tstart}\t{self.__getPeaks(peaks, data)[j]}\t{y[peaks[j]]}\t{integral}\t{integralMM}\t{integralExp}\t{rowsHalf[0]}\t{temp:.2f}\n")
-                    dl2_data.append([self.__getWFindex(data), self.__getPKindex(j, data), current_tstart, self.__getPeaks(peaks, data)[j], y[peaks[j]], integral, integralMM, integralExp, rowsHalf[0], temp])
+                    original_tstart = attrs_reco_float__getValue(i, 'tstart')
+                    original_pk0    = attrs_reco_int__getValue(i, 'pk0_pos')
+                    n_peaks         = attrs_reco_int__getValue(i, 'n_peaks')
+                    peak_idx        = attrs_reco_int__getValue(i, 'peak_idx')
+                    if isdoubleEvent:
+                        current_tstart = ((self.__getPeaks(peaks, wf_start)[j] - original_pk0) * dec * 8e-9) + original_tstart
+                    else:
+                        current_tstart  = float(attrs_reco_float__getValue(i, 'tstart1'))
+                    #
+                    f.write(f"{original_wf}\t{self.__getPKindex(j, n_peaks, peak_idx)}\t{current_tstart}\t{self.__getPeaks(peaks, wf_start)[j]}\t{y[peaks[j]]}\t{integral}\t{integralMM}\t{integralExp}\t{rowsHalf[0]}\t{temp:.2f}\n")
+                    dl2_data.append([original_wf, self.__getPKindex(j, n_peaks, peak_idx), current_tstart, self.__getPeaks(peaks, wf_start)[j], y[peaks[j]], integral, integralMM, integralExp, rowsHalf[0], temp])
                     j = j + 1
         h5file.close()
         GFhandler2.write(f"{Path(basename).with_suffix('.dl2.h5')}", dl2_data)

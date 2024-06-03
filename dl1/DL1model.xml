@@ -18,6 +18,7 @@
         </CArray>
         <CArray name="attrs_reco_int" dtype="int64" complevel="5" complib="gzip">
             <Attributes>
+                <Attribute name="Dec"/>            <!-- Decimation factor -->
                 <Attribute transformation="def transform(x): return int(x.decode('utf-8').split('_')[1])" 
                            name="original_wf"/>    <!-- DL0 waveform index -->
                 <Attribute name="wf_size"/>        <!-- Window (DL1) size of this waveform -->
@@ -47,7 +48,6 @@
             <Attributes>
                 <Attribute name="CurrentOffset"/>  <!-- It is the current offset of the DL0 circular buffer -->
                 <Attribute name="TriggerOffset"/>  <!-- It is the DL0 peak trigger offset of the ring buffer  -->
-                <Attribute name="Dec"/>            <!-- Decimation factor -->
                 <Attribute name="Eql"/>
                 <Attribute name="rp_id"/>          <!-- Redpitaya ID -->
                 <Attribute name="runid"/>          <!-- Identifies the execution phase to which the packets -->
