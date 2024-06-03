@@ -3,8 +3,6 @@ from scipy.signal import find_peaks
 import numpy as np
 from h5py import Dataset
 
-from dl1component import DL1WaveformList
-
 class DL0Decomposer():
     def __init__(self, 
                  wfdl0: Dataset,
