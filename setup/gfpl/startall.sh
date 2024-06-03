@@ -5,6 +5,8 @@ PIDS=gfcl.pids
 
 DL0_LOGS=$DAMS/logs/dl0
 
+CONDA_ENV_NAME="gammaflash"
+
 # Check if ODIR is defined
 if [ -z "$ODIR" ]; then
     echo "ODIR not defined"

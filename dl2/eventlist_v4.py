@@ -126,7 +126,7 @@ class Eventlist:
             else:
                 print(f"Il file '{nome_file}' non empty.")
         else:
-            print(f"Il file '{nome_file}' non esiste.")
+            print(f"Il file '{nome_file}' non esiste. Continuo")
 
     def create_directory(self, directory_path):
         if not os.path.exists(directory_path):
