@@ -30,4 +30,5 @@ class WorkerDL0toDL1(WorkerBase):
 			     	 "dest": dest2}
 			# Create result message
 			data1 = json.dumps(data1)
-			self.manager.result_queue.put(data1)
+			self.manager.result_lp_queue.put(data1)
+			# self.manager.result_queue.put(data1)

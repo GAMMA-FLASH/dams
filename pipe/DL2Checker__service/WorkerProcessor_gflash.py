@@ -8,7 +8,7 @@ from printcolors import *
 class WorkerDL2CCK(WorkerBase):
 	def __init__(self):
 		super().__init__()
-		self.json_path = '/home/worker/workspace/testgammaflash/dams/pipe/test/Out'
+		self.json_path = '/home/usergamma/workspace/test/Out'
 
 	def check_sameDL2(self, filePath_dl0_dl2, filePath_dl1_dl2):
 		# Initialize check variables  
@@ -72,7 +72,7 @@ class WorkerDL2CCK(WorkerBase):
 			print(f'{colore_giallo}{filePath_dl0_dl2}\n{filePath_dl1_dl2}{reset_colore}')
 			# If json_file_path already wasn't still created and both 'dl1.dl2.h5' and '.dl2.h5' exists
 			if (not os.path.exists(json_file_path)) and os.path.exists(filePath_dl0_dl2) and os.path.exists(filePath_dl1_dl2):
-				print(f"{colore_verde}i file ci sono: parte il controllo{reset_colore}")
+				# print(f"{colore_verde}i file ci sono: parte il controllo{reset_colore}")
 				res_dict = self.check_sameDL2(filePath_dl0_dl2, filePath_dl1_dl2)
 				# Check if there are differences in the result dictionary
 				if (res_dict['cnt_pk_notfound_h50'] != res_dict['cnt_pk_notfound_h51']) and \
@@ -80,6 +80,9 @@ class WorkerDL2CCK(WorkerBase):
 				   (len(res_dict['diff_rows']) > 0):
 					with open(json_file_path, 'w') as file_json:
 						json.dump(res_dict, file_json)
+					print(f"{colore_rosso}ATTENZIONE RILEVATA ANOMALIA! I DUE DL2 NON COINCIDONO!{reset_colore}")
+				else:
+					print(f"{colore_verde}NIENTE DA SEGNALARE. I DL2 COINCIDONO!{reset_colore}")
 			else:
 				print(f"{colore_rosso}i file NON ci sono o è già presente il result JSON file!{reset_colore}")
 			return None

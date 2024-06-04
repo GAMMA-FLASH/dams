@@ -28,4 +28,5 @@ class WorkerDL1toDL2(WorkerBase):
 			filename = os.path.basename(source.replace('.h5', '.dl2.h5'))
 			dl2_filename = os.path.join(dest, filename)
 			# Add message in queue
-			self.manager.result_queue.put(dl2_filename)
+			self.manager.result_lp_queue.put(dl2_filename)
+			# self.manager.result_queue.put(dl2_filename)
