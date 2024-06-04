@@ -1,4 +1,5 @@
 #!/bin/bash
+export PYTHONPATH=/home/usergamma/workspace/rta-dataprocessor/workers:/home/usergamma/workspace:/home/usergamma/workspace/dams/dl1
 
 if [ "$#" -eq 0 ]; then
     echo "Usage: ./test_GammaFlash.py N"
@@ -11,13 +12,13 @@ if [ "$#" -eq 0 ]; then
     exit 0
 fi
 # path_dl0='/home/worker/workspace/testgammaflash/Data/DL0/acquisizione_2022_06_24' 
-path_dl0='/home/worker/workspace/testgammaflash/dams/pipe/test/Data/DL0/acquisizione_0000' 
-path_dl1='/home/worker/workspace/testgammaflash/dams/pipe/test/Data/DL1/acquisizione_0000' 
-path_dl2='/home/worker/workspace/testgammaflash/dams/pipe/test/Data/DL2/acquisizione_0000' 
+path_dl0='/home/usergamma/workspace/dams/dl1/prova.h5' 
+path_dl1='/home/usergamma/workspace/Data/DL1/prova' 
+path_dl2='/home/usergamma/workspace/Data/DL2/prova' 
 path_json_result='/home/worker/workspace/testgammaflash/dams/pipe/test/Out'
 socket='tcp://localhost:5555'
 socket_cck='tcp://localhost:5559'
-config_path='/home/worker/workspace/testgammaflash/dams/pipe/config.json'
+config_path='/home/usergamma/workspace/dams/pipe/config.json'
 time_sleep_inframessage=1
 
 # Take argument in input

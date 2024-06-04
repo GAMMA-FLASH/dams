@@ -15,7 +15,8 @@
 	"monitoring_socket": "tcp://localhost:5552",
 	"manager_result_socket_type": ["pushpull"],
 	"manager_result_dataflow_type": ["string"],
-	"manager_result_socket": ["tcp://localhost:5559"],
+	"manager_result_lp_socket": ["tcp://localhost:5559"],
+	"manager_result_hp_socket": ["tcp://localhost:5560"],
 	"manager_num_workers": [13],
 	"comment": "datasockettype=pushpull|pubsub dataflowtype=binary|filename|string processingtype=process|thread"
   },
@@ -30,7 +31,8 @@
 	"monitoring_socket": "tcp://localhost:5552",
 	"manager_result_socket_type": ["pubsub"],
 	"manager_result_dataflow_type": ["string"],
-	"manager_result_socket": ["tcp://localhost:5553"],
+	"manager_result_lp_socket": ["tcp://localhost:5553"],
+	"manager_result_hp_socket": ["tcp://localhost:5554"],
 	"manager_num_workers": [13],
 	"comment": "datasockettype=pushpull|pubsub dataflowtype=binary|filename|string processingtype=process|thread"
   },
@@ -45,7 +47,8 @@
 	"monitoring_socket": "tcp://localhost:5552",
 	"manager_result_socket_type": ["pushpull"],
 	"manager_result_dataflow_type": ["string"],
-	"manager_result_socket": ["tcp://localhost:5559"],
+	"manager_result_lp_socket": ["tcp://localhost:5559"],
+	"manager_result_hp_socket": ["tcp://localhost:5560"],
 	"manager_num_workers": [13],
 	"comment": "datasockettype=pushpull|pubsub dataflowtype=binary|filename|string processingtype=process|thread"
   },
@@ -59,8 +62,9 @@
 	"command_socket": "tcp://localhost:5551",
 	"monitoring_socket": "tcp://localhost:5552",
 	"manager_result_socket_type": ["none"],
-	"manager_result_dataflow_type": ["string"],
-	"manager_result_socket": ["none"],
+	"manager_result_dataflow_type": ["none"],
+	"manager_result_lp_socket": ["none"],
+	"manager_result_hp_socket": ["none"],
 	"manager_num_workers": [5],
 	"comment": "datasockettype=pushpull|pubsub dataflowtype=binary|filename|string processingtype=process|thread"
   }

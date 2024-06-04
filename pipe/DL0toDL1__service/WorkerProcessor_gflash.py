@@ -7,7 +7,10 @@ class WorkerDL0toDL1(WorkerBase):
 	def __init__(self):
 		super().__init__()
 		# Create for eventlist
-		self.snapeventlist = EventlistSnapshot()
+		self.snapeventlist = EventlistSnapshot(
+			'/home/usergamma/workspace/dams/dl1/dl02dl1_config.json', # Config file
+			'/home/usergamma/workspace/dams/dl1/DL1model.xml'		  # XML model
+		)
 
 	def process_data(self, data):
 		if self.supervisor.dataflowtype == "binary" or self.supervisor.dataflowtype == "filename":

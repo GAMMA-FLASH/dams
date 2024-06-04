@@ -8,7 +8,10 @@ class WorkerDL1toDL2(WorkerBase):
 	def __init__(self):
 		super().__init__()
 		# Create for eventlist
-		self.eventlist = Eventlist(from_dl1=True)
+		self.eventlist = Eventlist(
+			from_dl1=True,
+			xml_model_path='/home/usergamma/workspace/dams/dl1/DL1model.xml'
+		)
 
 	def process_data(self, data):
 		if self.supervisor.dataflowtype == "binary" or self.supervisor.dataflowtype == "filename":
