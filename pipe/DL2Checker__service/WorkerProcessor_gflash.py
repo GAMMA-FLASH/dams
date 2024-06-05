@@ -44,7 +44,7 @@ class WorkerDL2CCK(WorkerBase):
 			with h5py.File(filePath_dl1_dl2, mode='r') as h5_1:
 				evlst0 = h5_0['dl2']['eventlist']
 				evlst1 = h5_1['dl2']['eventlist']
-				for data0, data1 in tqdm(zip(evlst0, evlst1), total=cnt_len_h50):
+				for data0, data1 in tqdm(zip(evlst0, evlst1), total=cnt_len_h50, disable=True):
 					if not data0==data1:
 						F_same = F_same and False
 						res_dict['diff_rows'].append({'DL0toDL2': str(data0), 'DL1toDL2': str(data1)})
@@ -55,7 +55,7 @@ class WorkerDL2CCK(WorkerBase):
 			raise Exception("A string dataflowtype is expected")
 			
 		if self.supervisor.dataflowtype == "string":
-			print(f'{colore_giallo}{data}{reset_colore}')
+			# print(f'{colore_giallo}{data}{reset_colore}')
 			json_dir = os.path.join(os.path.dirname(os.path.dirname(data)), 'json')
 			if 'dl1' in data:
 				# DL1 to DL2
@@ -69,9 +69,10 @@ class WorkerDL2CCK(WorkerBase):
 				filename = os.path.basename(data).replace('.dl2.h5', '.json')
 			json_file_path   = os.path.join(self.json_path, filename)
 			#
-			print(f'{colore_giallo}{filePath_dl0_dl2}\n{filePath_dl1_dl2}{reset_colore}')
+			# print(f'{colore_giallo}{filePath_dl0_dl2}\n{filePath_dl1_dl2}{reset_colore}')
 			# If json_file_path already wasn't still created and both 'dl1.dl2.h5' and '.dl2.h5' exists
 			if (not os.path.exists(json_file_path)) and os.path.exists(filePath_dl0_dl2) and os.path.exists(filePath_dl1_dl2):
+				print(f'Processing {filePath_dl0_dl2} vs {filePath_dl1_dl2}')
 				# print(f"{colore_verde}i file ci sono: parte il controllo{reset_colore}")
 				res_dict = self.check_sameDL2(filePath_dl0_dl2, filePath_dl1_dl2)
 				# Check if there are differences in the result dictionary
@@ -80,9 +81,11 @@ class WorkerDL2CCK(WorkerBase):
 				   (len(res_dict['diff_rows']) > 0):
 					with open(json_file_path, 'w') as file_json:
 						json.dump(res_dict, file_json)
-					print(f"{colore_rosso}ATTENZIONE RILEVATA ANOMALIA! I DUE DL2 NON COINCIDONO!{reset_colore}")
+					print(f"{filePath_dl0_dl2} vs {filePath_dl1_dl2}:\n"
+		   				  f"{colore_rosso}ATTENZIONE RILEVATA ANOMALIA! I DUE DL2 NON COINCIDONO!{reset_colore}")
 				else:
-					print(f"{colore_verde}NIENTE DA SEGNALARE. I DL2 COINCIDONO!{reset_colore}")
-			else:
-				print(f"{colore_rosso}i file NON ci sono o è già presente il result JSON file!{reset_colore}")
+					print(f"{filePath_dl0_dl2} vs {filePath_dl1_dl2}:\n"
+						  f"{colore_verde}NIENTE DA SEGNALARE. I DL2 COINCIDONO!{reset_colore}")
+			# else:
+				# print(f"{colore_rosso}i file NON ci sono o è già presente il result JSON file!{reset_colore}")
 			return None
