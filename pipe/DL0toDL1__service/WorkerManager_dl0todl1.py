@@ -1,7 +1,7 @@
 from WorkerManager import WorkerManager
 from WorkerProcess import WorkerProcess
 from WorkerThread import WorkerThread
-from DL0toDL1__service.WorkerProcessor_gflash import WorkerDL0toDL1
+from DL0toDL1__service.WorkerProcessor_dl0todl1 import WorkerDL0toDL1
 
 class WorkerManager_DL0toDL1(WorkerManager):
 	def __init__(self, manager_id, supervisor, name = "dl0dl1_wm"):

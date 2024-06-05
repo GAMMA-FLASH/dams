@@ -1,5 +1,5 @@
 from Supervisor import Supervisor
-from DL0toDL1__service.WorkerManager_gflash import WorkerManager_DL0toDL1
+from DL0toDL1__service.WorkerManager_dl0todl1 import WorkerManager_DL0toDL1
 import json
 import os
 

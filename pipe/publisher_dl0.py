@@ -8,8 +8,11 @@ from printcolors import colore_verde, reset_colore, colore_giallo
 
 
 
-def publish(path_dl0: str, path_dl1: str, path_dl2: str, 
-            F_sleep: bool, socket: zmq.Socket,
+def publish(path_dl0: str, 
+            path_dl1: str, 
+            path_dl2: str, 
+            F_sleep: bool, 
+            socket: zmq.Socket,
             time_sleep_inframessage: int):
     if not os.path.exists(path_dl0):
         print(f"WARNING! path_dl0 \"{path_dl0}\" does not exists!")
