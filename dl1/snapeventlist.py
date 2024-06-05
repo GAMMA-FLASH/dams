@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from pathlib import Path
 import os
 from tqdm import tqdm
 import json
@@ -102,8 +102,15 @@ class EventlistSnapshot():
                 # Store column names as a single attribute
                 dataset.attrs['column_names'] = ','.join(column_names)
     
-    def process_file(self, filename, outdir, startEvent=0, endEvent=-1, pbar_show=True):
-        print('Processing', filename)
+    def process_file(self, filename, outdir, startEvent=0, endEvent=-1, pbar_show=False):
+        print("Processing " + filename)
+        self.create_directory(outdir)
+        basename = Path(outdir, os.path.basename(filename))
+        outputfilename = f"{Path(basename).with_suffix('.dl2.h5')}"
+        # Check if file exists and is not empty
+        self.delete_empty_file(outputfilename)
+        if os.path.exists(outputfilename):
+            return
         # Create the name of the new file of output of type dl1 
         dl1_path = os.path.join(outdir, os.path.basename(filename).replace('.h5', '.dl1.h5'))
         # Open the source file in read mode
@@ -120,5 +127,26 @@ class EventlistSnapshot():
                 self.__decomposeWF(wfdl0List[wfdl0name], 
                                    wfdl0name, 
                                    i)
-        nchunks = min(endEvent-startEvent, 8)
         self.__dl1Write(dl1_path)
+
+
+    def delete_empty_file(self, nome_file):
+        # Verifica se il file esiste e ha lunghezza zero
+        if os.path.exists(nome_file):
+            if os.path.getsize(nome_file) == 0:
+                try:
+                    # Cancella il file
+                    os.remove(nome_file)
+                    print(f"Il file '{nome_file}' è stato eliminato.")
+                except OSError as e:
+                    print(f"Errore durante l'eliminazione del file '{nome_file}': {e}")
+            else:
+                print(f"Il file '{nome_file}' non empty.")
+        else:
+            print(f"Il file '{nome_file}' non esiste.")
+            
+
+    def create_directory(self, directory_path):
+        if not os.path.exists(directory_path):
+            os.makedirs(directory_path)
+            print(f"La directory '{directory_path}' è stata creata.")
