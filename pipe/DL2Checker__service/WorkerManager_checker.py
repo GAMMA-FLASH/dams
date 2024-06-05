@@ -1,7 +1,7 @@
 from WorkerManager import WorkerManager
 from WorkerProcess import WorkerProcess
 from WorkerThread import WorkerThread
-from DL2Checker__service.WorkerProcessor_gflash import WorkerDL2CCK
+from DL2Checker__service.WorkerProcessor_checker import WorkerDL2CCK
 
 class WorkerManager_DL2CCK(WorkerManager):
 	def __init__(self, manager_id, supervisor, name = "dl2ccheck_wm"):
