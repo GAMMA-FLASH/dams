@@ -16,7 +16,7 @@ def publish(path_dl0: str,
             time_sleep_inframessage: int):
     if not os.path.exists(path_dl0):
         print(f"WARNING! path_dl0 \"{path_dl0}\" does not exists!")
-        sys.exit(1)
+        return
     # BASE CASE: path_dl0 is a file
     if not os.path.isdir(path_dl0):
         if not ('.ok' == os.path.splitext(path_dl0)[-1]):
