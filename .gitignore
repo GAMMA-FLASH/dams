@@ -6,3 +6,5 @@ gf_venv
 pipe/test
 *.h5
 nohup.out
+*.txt
+*.log
