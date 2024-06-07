@@ -12,13 +12,20 @@ if [ "$#" -eq 0 ]; then
     exit 0
 fi
 # path_dl0='/home/worker/workspace/testgammaflash/Data/DL0/acquisizione_2022_06_24' 
+# Define Socket Address
+socket='tcp://127.0.0.1:5555'
+socket_cck='tcp://127.0.0.1:5559'
+# Define DL path
 path_dl0='/home/usergamma/workspace/test/Data/DL0/' 
 path_dl1='/home/usergamma/workspace/test/Data/DL1/' 
 path_dl2='/home/usergamma/workspace/test/Data/DL2/' 
+# Define Out JSON path
 path_json_result='/home/usergamma/workspace/test/Out'
-socket='tcp://127.0.0.1:5555'
-socket_cck='tcp://127.0.0.1:5559'
+# Define config JSON path for RTA-Dataprocessor
 config_path='/home/usergamma/workspace/dams/pipe/config.json'
+# Define log file path for RTA-Dataprocessor
+log_path='/home/usergamma/workspace/dams/pipe/logs/logs.log'
+# Time delay between two messages of the Publisher
 time_sleep_inframessage=1
 
 # Take argument in input
@@ -40,7 +47,7 @@ elif [ $arg -eq 3 ]; then
     python -c "from DL1toDL2__service.Supervisor_dl1todl2 import Supervisor_DL1toDL2; Supervisor_DL1toDL2('${config_path}', 'DL1toDL2').start()"
 elif [ $arg -eq 4 ]; then
     echo ========= START DL2Checker ========
-    # rm -rf $path_json_result/*
+    rm -rf $path_json_result/*
     python -c "from DL2Checker__service.Supervisor_checker import Supervisor_DL2CCK; Supervisor_DL2CCK('${config_path}', 'DL2Checker').start()"
 elif [ $arg -eq 5 ]; then
     echo ========= START DL2Publisher ========
