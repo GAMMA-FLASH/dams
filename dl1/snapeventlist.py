@@ -21,8 +21,6 @@ class EventlistSnapshot():
         self.configfile = configfile_path
         tree = ET.parse(xmlmodel_path)
         self.model_root = tree.getroot()
-        # 
-        self.dl1wflist = DL1WaveformList()
 
     def __decomposeWF(self, 
                       wfdl0_dataset: Dataset, 
@@ -103,6 +101,7 @@ class EventlistSnapshot():
                 dataset.attrs['column_names'] = ','.join(column_names)
     
     def process_file(self, filename, outdir, startEvent=0, endEvent=-1, pbar_show=False):
+        self.dl1wflist = DL1WaveformList()
         print("Processing " + filename)
         self.create_directory(outdir)
         basename = Path(outdir, os.path.basename(filename))
