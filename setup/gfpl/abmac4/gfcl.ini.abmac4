@@ -10,6 +10,9 @@ Token = GGRHiyGKPdKZ0EF9ZiV2RL1zrU9mYbRv3D780CWZxmoDcmCtJHeAn9YhY8CrQpRpTRmCCkE8
 Org = GAMMA-FLASH
 Bucket = RP-COUNTS
 BucketHk = HK
+# Determines the timestamp used to create the point in the InfluxDB. Options: 'RP' to use tstart from the waveform. 'MC' to sample the time from main computer. 
+Timestamp_Wf = MC 
+Timestamp_Hk = RP
 
 [SPECTRUM_AN]
 Enable = yes
