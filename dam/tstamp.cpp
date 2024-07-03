@@ -74,7 +74,7 @@ void *ppsAcqThreadFcn(void *ptr) {
         int res = pps_wait();
         if (res == 0) { // PPS found wait till the next one
         	m_status &= ~(uint32_t)TimeStamp::TS_NOPPS;
-			g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_PPS_NOK);
+			// g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_PPS_NOK);
 			printf("PPS received\n");
         	usleep(750000);
         } else { // No signal/fix from PPS
@@ -121,7 +121,7 @@ static inline void gga_read() {
             				
             				if (dnsec < 1000000000) {
 								
-								g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_OVERTIME);
+								// g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_OVERTIME);
 								pthread_mutex_lock(&m_tstamp_lock);
 
 								m_tstamp_ts.tv_sec = m_pps_ts.tv_sec;
@@ -148,7 +148,7 @@ static inline void gga_read() {
 									g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_NOTIME);
 								} else {
 									printf("System time is within %d minutes of GNGGA time. difference %d min\n", threshold_minutes, minute_difference);
-									g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_NOTIME);
+									// g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_NOTIME);
 								}
 
 								//printf("%02X %s\n", m_status, g_uart_buff);
@@ -183,7 +183,7 @@ void *ggaAcqThreadFcn(void *ptr) {
         int res = uart_read();
         if (res > 0) { // Search GGA sentence 
         	m_status &= ~(uint32_t)TimeStamp::TS_NOUART;
-			g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_NOUART);
+			// g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_NOUART);
         	gga_read();
         } else {	// No data from UART
         	m_status += (uint32_t)TimeStamp::TS_NOUART;

@@ -15,7 +15,7 @@ using namespace std;
 SystemInfo::SystemInfo() {
     
     state = STT_SERVICE;
-    flags = FLG_PPS_NOK + FLG_GPS_NOUART + FLG_GPS_OVERTIME + FLG_GPS_NOTIME + FLG_TRG_ERR;
+    flags = 0; //initialize flags to zero
     packetCount = 0;
     
     totAcqWformCount = 0;

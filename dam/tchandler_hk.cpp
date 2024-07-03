@@ -50,6 +50,9 @@ int TcHandler::sendHk() {
         
             // TODO: handle return errors
             res = g_ctrlServer.send(buff, buffSz);
+
+            //reset flags
+            g_systemInfo.flags = 0;
             
         }
 	

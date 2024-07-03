@@ -205,7 +205,7 @@ void *acqThreadFcn(void *ptr) {
 			// Release buffer
 			m_fifo.pushRelease();
 			
-			g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_TRG_ERR);
+			// g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_TRG_ERR);
 			
 			g_systemInfo.totAcqWformCount++;
 			g_systemInfo.acqWformCount++;

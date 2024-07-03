@@ -32,7 +32,7 @@ int TcHandler::execStartAcq(Header *tcHeader) {
         g_systemInfo.waitUsecs = data->waitUsecs;
         
         // Clear trigger error flag
-        g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_TRG_ERR);
+        // g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_TRG_ERR);
         
         TRACE("TcHandler::execStartAcq: source %d maxWaveNo %d waitUsecs %d\n", g_systemInfo.source, g_systemInfo.maxWaveNo, g_systemInfo.waitUsecs);
         
@@ -82,7 +82,7 @@ int TcHandler::execStopAcq(Header *tcHeader) {
         usleep(100);
         
         // Clear trigger error flag
-        g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_TRG_ERR);
+        // g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_TRG_ERR);
         
         sendTcExec(tcHeader, TC_EX_OK);
         
