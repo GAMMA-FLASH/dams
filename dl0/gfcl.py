@@ -163,7 +163,7 @@ class Hk:
         gps_no_uart = 1 if self.flags & 0x40 else 0
         gps_overtime = 1 if self.flags & 0x20 else 0
         gps_invalid_time = 1 if self.flags & 0x10 else 0
-        err = 1 if self.flags & 0x10 else 0
+        err = 1 if self.flags & 0x01 else 0
 
         if INFLUX_HK_TIMESTAMP == TimestampOptions.MainComputer:
             timepoint_influx = math.trunc(self.trx * 1000)
