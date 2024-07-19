@@ -5,6 +5,7 @@
 #include <errno.h>
 
 #include "uart.h"
+#include <cstring> 
 
 int g_uart_fd = -1;
 int g_uart_nbytes = -1;
@@ -55,8 +56,10 @@ int uart_init() {
     tcflush(g_uart_fd, TCIFLUSH);
     tcsetattr(g_uart_fd, TCSANOW, &settings);
     
-    // Enable buffering
-    fcntl(g_uart_fd, F_SETFL, 0);
+    // // Enable buffering
+    // fcntl(g_uart_fd, F_SETFL, 0);
+    // Set the file descriptor to non-blocking mode
+    fcntl(g_uart_fd, F_SETFL, FNDELAY);
 
     return 0;
     
@@ -78,13 +81,22 @@ int uart_uninit() {
 }
 
 int uart_read() {
-	
-	if (g_uart_fd < 0) {
-		return -1;
-	}
-	
-	g_uart_nbytes = ::read(g_uart_fd, (void*)g_uart_buff, g_uart_buff_sz);
-	
-	return g_uart_nbytes;
+    
+    if (g_uart_fd < 0) {
+        return -1;
+    }
+    
+    g_uart_nbytes = ::read(g_uart_fd, (void*)g_uart_buff, g_uart_buff_sz);
+    if (g_uart_nbytes < 0 && errno == EAGAIN) {
+        // No data available
+        fprintf(stderr, "UART read error: %s\n", strerror(errno));
+        return -2;
+    } else if (g_uart_nbytes < 0) {
+        // An error occurred
+        fprintf(stderr, "UART read error: %s\n", strerror(errno));
+        return -1;
+    }
+    
+    return g_uart_nbytes;
 
 }
