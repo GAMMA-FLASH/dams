@@ -52,11 +52,16 @@ static inline void delta_time(const struct timespec *t1, const struct timespec *
 
 static inline int pps_wait() {
 	int count = 0;
+	uint32_t state, old_state = 0x0000 ;
 	for(int i = 0; i < 500000; i++) {
-		if (g_hk_fpga_reg_mem->in_p & HK_FPGA_GPIO_BIT7) {
+		state = g_hk_fpga_reg_mem->in_p & HK_FPGA_GPIO_BIT7;
+		printf("The state of the register is %d\n",  state);
+		if ( state != old_state ) {
 			clock_gettime(CLOCK_REALTIME, &m_pps_ts);
 			printf("value of PPS checked: %d times\n", count);
-			return 0;
+			old_state = state;
+			if (i > 0) //If PPS does not change from 1, then PPS is not active
+				return 0;
 		} else {
 			count++;
 			usleep(5);
@@ -118,7 +123,7 @@ static inline void gga_read() {
 							clock_gettime(CLOCK_REALTIME, &m_gga_ts);
 							
 							uint32_t dnsec = delta_nsec(&m_gga_ts, &m_pps_ts);
-            				
+            				printf("delta sec between current OS and PPS sampled time:  %ds\n", dnsec);
             				if (dnsec < 1000000000) {
 								
 								g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_OVERTIME);
