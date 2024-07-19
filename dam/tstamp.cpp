@@ -64,7 +64,7 @@ static inline int pps_wait() {
 			old_state = state;
 			if (i > 0) { //If PPS does not change from 1, then PPS is not active
 				clock_gettime(CLOCK_REALTIME, &m_pps_ts);
-			    printf("PPS updated at %d iteration. state: %d, old: %d \n", count, state, old_state);	
+			    // printf("PPS updated at %d iteration. state: %d, old: %d \n", count, state, old_state);	
 				return 0;
 			}	
 		} else {
@@ -72,7 +72,7 @@ static inline int pps_wait() {
 			usleep(5);
 		}
 	}
-	printf("value of PPS checked: %d times\n", count);
+	// printf("value of PPS checked: %d times\n", count);
 	return -1;
 }
 
@@ -85,12 +85,12 @@ void *ppsAcqThreadFcn(void *ptr) {
         if (res == 0) { // PPS found wait till the next one
         	m_status &= ~(uint32_t)TimeStamp::TS_NOPPS;
 			g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_PPS_NOK);
-			printf("PPS received\n");
+			// printf("PPS received\n");
         	usleep(750000);
         } else { // No signal/fix from PPS
         	m_status += (uint32_t)TimeStamp::TS_NOPPS;
 			g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_PPS_NOK);
-			printf("PPS not received\n");
+			// printf("PPS not received\n");
         	sleep(1);
         }
 /*
