@@ -171,7 +171,7 @@ static inline void gga_read() {
 								
 							} 
 							else {
-								printf("not checking time. delta sec between current OS and PPS sampled time is greater than 1s: %d ns \n", dnsec);
+								printf("not checking time. delta sec between current OS and PPS sampled time is greater than 1s: %u ns \n", dnsec);
 								g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_OVERTIME);
 								g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_NOTIME);
 							}
