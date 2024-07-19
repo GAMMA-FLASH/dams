@@ -31,10 +31,14 @@ pthread_mutex_t m_tstamp_lock;
 static inline uint32_t delta_nsec(const struct timespec *t1, const struct timespec *t0) {
 	int32_t dsec = t1->tv_sec - t0->tv_sec;
 	int32_t dnsec = t1->tv_nsec - t0->tv_nsec;
-	if (dsec > 0 && dsec < 1) {
-		dnsec += 1000000000;
-	} else if ( dsec >= 1) {
-		dnsec += 2000000000;
+	if (dsec > 0 ){
+		if (dsec > 2){
+			dsec = 2e9;
+		}
+		else{
+			dsec = dsec * 2e9;
+		}
+		dnsec += dsec;
 	}
 	return u_int32_t(dnsec); 
 }
