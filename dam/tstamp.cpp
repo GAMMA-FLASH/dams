@@ -36,11 +36,11 @@ static inline uint32_t delta_nsec(const struct timespec *t1, const struct timesp
 			dsec = 2000000000U;
 		}
 		else{
-			dsec = dsec * 2000000000U;
+			dsec = dsec * 1000000000U;
 		}
-		dsec += (u_int32_t) dnsec;
+		dsec += (uint32_t) dnsec;
 	}
-	return (u_int32_t) dsec; 
+	return (uint32_t) dsec; 
 }
 
 static inline void delta_time(const struct timespec *t1, const struct timespec *t0, struct timespec *dt) {
