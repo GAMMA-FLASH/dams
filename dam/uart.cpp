@@ -102,6 +102,7 @@ int uart_read() {
         }
     }
     if (nodata){
+        fprintf(stderr, "UART read error: %s\n", strerror(errno));
         return -2;
     }
         

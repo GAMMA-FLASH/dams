@@ -203,6 +203,8 @@ void *ggaAcqThreadFcn(void *ptr) {
         } else {	// No data from UART
         	m_status += (uint32_t)TimeStamp::TS_NOUART;
 			g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_NOUART);
+			g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_NOTIME);
+			g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_OVERTIME);
         	sleep(1);
         }
     }
