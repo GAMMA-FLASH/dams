@@ -53,7 +53,7 @@ static inline void delta_time(const struct timespec *t1, const struct timespec *
 static inline int pps_wait() {
 	int count = 0;
 	uint32_t state, old_state = 0x0000 ;
-	for(int i = 0; i < 500000; i++) {
+	for(int i = 0; i < 150000; i++) {
 		state = g_hk_fpga_reg_mem->in_p & HK_FPGA_GPIO_BIT7;
 		//printf("The state of the register is %d\n",  state);
 		if ( state != old_state ) {
@@ -126,8 +126,8 @@ static inline void gga_read() {
 							clock_gettime(CLOCK_REALTIME, &m_gga_ts);
 							
 							uint32_t dnsec = delta_nsec(&m_gga_ts, &m_pps_ts);
- printf("pps time is %ld.%ld\n", m_pps_ts.tv_sec , m_pps_ts.tv_nsec);           				
-printf("delta sec between current OS and PPS sampled time:  %ds\n", dnsec);
+							printf("pps time is %ld.%ld\n", m_pps_ts.tv_sec , m_pps_ts.tv_nsec);           				
+							printf("delta sec between current OS and PPS sampled time:  %ds\n", dnsec);
             				if (dnsec < 1000000000) {
 								
 								g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_OVERTIME);
@@ -168,6 +168,7 @@ printf("delta sec between current OS and PPS sampled time:  %ds\n", dnsec);
 							else {
 								printf("not checking time\n");
 								g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_OVERTIME);
+								g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_NOTIME);
 							}
 							
 						}
