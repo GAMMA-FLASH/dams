@@ -133,7 +133,7 @@ static inline void gga_read() {
 							
 							uint32_t dnsec = delta_nsec(&m_gga_ts, &m_pps_ts);
 							if (dnsec < 1000000000) {
-								printf("delta sec between current OS and PPS sampled time is lower than 1s: %d ns \n", dnsec);
+								printf("delta sec between current OS and PPS sampled time is lower than 1s: %u ns \n", dnsec);
             				
 								g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_OVERTIME);
 								pthread_mutex_lock(&m_tstamp_lock);
