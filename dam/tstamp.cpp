@@ -32,6 +32,7 @@ static inline uint32_t delta_nsec(const struct timespec *t1, const struct timesp
 	uint32_t dsec = t1->tv_sec - t0->tv_sec;
 	uint32_t dnsec = t1->tv_nsec - t0->tv_nsec;
 	if (dsec > 0) {
+		printf("more than one second diff");
 		dnsec += 1000000000;
 	}
 	return dnsec; 
@@ -127,7 +128,7 @@ static inline void gga_read() {
 							
 							uint32_t dnsec = delta_nsec(&m_gga_ts, &m_pps_ts);
 							printf("pps time is %ld.%ld\n", m_pps_ts.tv_sec , m_pps_ts.tv_nsec);           				
-							printf("delta sec between current OS and PPS sampled time:  %ds\n", dnsec);
+							printf("delta sec between current OS and PPS sampled time:  %ds\ns", dnsec);
             				if (dnsec < 1000000000) {
 								
 								g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_OVERTIME);
