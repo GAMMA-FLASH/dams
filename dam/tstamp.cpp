@@ -32,9 +32,7 @@ static inline uint32_t delta_nsec(const struct timespec *t1, const struct timesp
 	int32_t dsec = t1->tv_sec - t0->tv_sec;
 	int32_t dnsec = t1->tv_nsec - t0->tv_nsec;
 	if (dsec > 0) {
-		printf("more than one second diff. diff: %d\n", dnsec);
 		dnsec += 1000000000;
-		printf("more than one second diff. diff: %d\n", dnsec);
 	}
 	return u_int32_t(dnsec); 
 }
