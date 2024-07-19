@@ -127,10 +127,9 @@ static inline void gga_read() {
 							clock_gettime(CLOCK_REALTIME, &m_gga_ts);
 							
 							uint32_t dnsec = delta_nsec(&m_gga_ts, &m_pps_ts);
-							printf("pps time is %ld.%ld\n", m_pps_ts.tv_sec , m_pps_ts.tv_nsec);           				
-							printf("delta sec between current OS and PPS sampled time:  %ld ns \n", dnsec);
-            				if (dnsec < 1000000000) {
-								
+							if (dnsec < 1000000000) {
+								printf("delta sec between current OS and PPS sampled time is greater than 1s: %ld ns \n", dnsec);
+            				
 								g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_OVERTIME);
 								pthread_mutex_lock(&m_tstamp_lock);
 
@@ -167,7 +166,7 @@ static inline void gga_read() {
 								
 							} 
 							else {
-								printf("not checking time\n");
+								printf("not checking time. delta sec between current OS and PPS sampled time is lower than 1s: %ld ns \n", dnsec);
 								g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_OVERTIME);
 								g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_NOTIME);
 							}
