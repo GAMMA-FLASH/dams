@@ -84,6 +84,7 @@ int uart_read() {
 	}
 	
 	g_uart_nbytes = ::read(g_uart_fd, (void*)g_uart_buff, g_uart_buff_sz);
+    printf("got uart msg\n");
 	
 	return g_uart_nbytes;
 
