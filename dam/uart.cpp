@@ -81,22 +81,30 @@ int uart_uninit() {
 }
 
 int uart_read() {
-    
+    bool nodata = false;
     if (g_uart_fd < 0) {
         return -1;
     }
-    
-    g_uart_nbytes = ::read(g_uart_fd, (void*)g_uart_buff, g_uart_buff_sz);
-    if (g_uart_nbytes < 0 && errno == EAGAIN) {
-        // No data available
-        fprintf(stderr, "UART read error: %s\n", strerror(errno));
-        return -2;
-    } else if (g_uart_nbytes < 0) {
-        // An error occurred
-        fprintf(stderr, "UART read error: %s\n", strerror(errno));
-        return -1;
+    for (int i = 0 ; i < 5e6; i++) {
+        g_uart_nbytes = ::read(g_uart_fd, (void*)g_uart_buff, g_uart_buff_sz);
+        if (g_uart_nbytes < 0 && errno == EAGAIN) {
+            // No data available
+            fprintf(stderr, "UART read error: %s\n", strerror(errno));
+            nodata=true;
+        } else if (g_uart_nbytes < 0) {
+            // An error occurred
+            fprintf(stderr, "UART read error: %s\n", strerror(errno));
+            return -1;
+        }
+        else if (g_uart_nbytes >= 0) {
+            nodata = false;
+            break;
+        }
     }
-    
+    if (nodata){
+        return -2;
+    }
+        
     return g_uart_nbytes;
 
 }
