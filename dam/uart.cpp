@@ -89,7 +89,7 @@ int uart_read() {
         g_uart_nbytes = ::read(g_uart_fd, (void*)g_uart_buff, g_uart_buff_sz);
         if (g_uart_nbytes < 0 && errno == EAGAIN) {
             // No data available
-            fprintf(stderr, "UART read error: %s\n", strerror(errno));
+            // fprintf(stderr, "UART read error: %s\n", strerror(errno));
             nodata=true;
         } else if (g_uart_nbytes < 0) {
             // An error occurred
