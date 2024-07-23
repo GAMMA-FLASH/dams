@@ -8,7 +8,8 @@ fi
 cd /root/workspace/dams/dam
 if [  $(basename `git rev-parse --show-toplevel`) == "dams" ]; then
 	git clean -fdx
-        git checkout $BRANCH
+        git fetch
+	git checkout $BRANCH
 	git pull origin $BRANCH
        	make
 else
