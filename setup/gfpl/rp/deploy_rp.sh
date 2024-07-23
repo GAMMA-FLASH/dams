@@ -56,7 +56,7 @@ LOGS="$DAMS/logs/install_dam_rp"
 
 ssh_update_command() {
     local ip=$1
-    command="ssh $ip 'bash -s' < $SCRIPT_DIR/update_rp.sh $BRANCH_NAME &>> $2 &"
+    command="ssh $ip 'bash -s' < $SCRIPT_DIR/update_rp.sh $BRANCH_NAME &> $2 &"
     echo "starting '$command'"
     eval $command
     
