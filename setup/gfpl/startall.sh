@@ -38,7 +38,7 @@ else
     PYTHON=python
 fi
 
-export PYTHONUNBUFFERED=yes
+# export PYTHONUNBUFFERED=yes
 nohup $PYTHON $GFCL --addr 192.168.1.101 --port 1234 --outdir $ODIR/RPG101/35mV/ --wformno 1000 > $DL0_LOGS/gfcl_RP101.log &
 nohup $PYTHON $GFCL --addr 192.168.1.102 --port 1234 --outdir $ODIR/RPG102/35mV/ --wformno 1000 > $DL0_LOGS/gfcl_RP102.log &
 nohup $PYTHON $GFCL --addr 192.168.1.103 --port 1234 --outdir $ODIR/RPG103/35mV/ --wformno 1000 > $DL0_LOGS/gfcl_RP103.log &
