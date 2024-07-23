@@ -24,11 +24,11 @@ ssh `rp`
 from client, multiple build:
 from 101 to 106
 ```
-$DAMS/setup/rp/deploy_rp.sh --ip all --branch <branch_name>
+$DAMS/setup/rp/deploy_rp.sh --ip all --version <branch_or_tag_name>
 ```
 specific rp:
 ```
-$DAMS/setup/rp/deploy_rp.sh --ip 101 --ip 102 --branch <branch_name>
+$DAMS/setup/rp/deploy_rp.sh --ip 101 --ip 102 --version <branch_or_tag_name>
 
 ```
 

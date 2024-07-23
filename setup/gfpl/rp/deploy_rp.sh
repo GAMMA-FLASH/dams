@@ -7,7 +7,7 @@ if [ -z "$DAMS" ]; then
 fi
 
 help() {
-    echo "deploy_rp [--branch <branch_name>] [--ip <ip_address>] [--ip <ip_address>] ..."
+    echo "deploy_rp [--version <branch_or_tag_name>] [--ip <ip_address>] [--ip <ip_address>] ..."
 }
 
 POSITIONAL_ARGS=()
@@ -20,7 +20,7 @@ while [[ $# -gt 0 ]]; do
             shift # past argument
             shift # past value
             ;;
-        -b|--branch)
+        -v|--version)
             BRANCH_NAME="$2"
             shift # past argument
             shift # past value
@@ -41,23 +41,18 @@ set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
 echo "Branch Name     = ${BRANCH_NAME}"
 echo "RP IP Addresses = ${RP_IPS[@]}"
-echo "Number of IPs   = ${#RP_IPS[@]}"
+
 
 if [[ -n ${POSITIONAL_ARGS[0]} ]]; then
     echo "Last line of file specified as non-opt/last argument:"
     BRANCH_NAME=${POSITIONAL_ARGS[0]}
 fi
 
-# Sample code to demonstrate the array usage
-for ip in "${RP_IPS[@]}"; do
-    echo "Deploying to RP at IP: $ip"
-done
-
 SCRIPT_DIR=$(dirname $0)
 
 UPDATE_SCRIPT="${SCRIPT_DIR}/update_rp.sh"
 
-LOGS="$DAMS/logs/install_dam_rp/"
+LOGS="$DAMS/logs/install_dam_rp"
 
 ssh_update_command() {
     local ip=$1
@@ -71,16 +66,17 @@ ssh_update_command() {
 }
 
 echo "Storing logs in $LOGS"
+mkdir -p $LOGS
 
 if [[ ${#RP_IPS[@]} -eq 1 && ${RP_IPS[0]} == "all" ]]; then
     for i in {101..106}; do
-        ssh_update_command "$i" "$SCRIPT_DIR/update_$i.log"
+        ssh_update_command "$i" "$LOGS/update_$i.log"
     done
 else
     for ip in "${RP_IPS[@]}"; do
         if [[ $ip =~ ^10[1-6]$ ]]; then
 		echo $ip
-            ssh_update_command "$ip" "$SCRIPT_DIR/update_$ip.log"
+            ssh_update_command "$ip" "$LOGS/update_$ip.log"
         else
             echo "Invalid argument. Please provide a number between 101 and 106."
             exit 1
@@ -90,4 +86,4 @@ fi
 
 wait 
 
-
+echo "Done"
