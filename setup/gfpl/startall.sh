@@ -1,6 +1,5 @@
 #!/bin/bash
 
-GFCL=gfcl.py
 PIDS=gfcl.pids
 
 DL0_LOGS=$DAMS/logs/dl0
@@ -19,6 +18,9 @@ if [ -z "$DAMS" ]; then
     exit 1
 fi
 mkdir -p $DL0_LOGS
+
+GFCL=${GFCL:-"$DAMS/dl0/gfcl.py"}
+echo "Using Client Script: ${GFCL}"
 
 cd $DAMS/dl0
 
