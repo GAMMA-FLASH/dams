@@ -30,14 +30,14 @@ cd $DAMS/setup/gfpl && ./bootstrap2.sh
 
 ## start the acquisition
 
-To start all clients use:
+To start all clients:
 ```
 $DAMS/setup/gfpl/startall.sh
 ```
 N.B. logs will be in $DAMS/logs/dl0
 
 
-To start just one client use:
+To start just one client:
 ```
 $DAMS/setup/gfpl/startone_attached.sh
 ```
@@ -45,12 +45,12 @@ it will prompt to insert the RPID (101 to 106)
 
 ## start the acquisition
 
-To stop all clients use:
+To stop all clients:
 ```
 $DAMS/setup/gfpl/stop_clients.sh
 ```
 
-To stop just one client use specify the RPID (101-106):
+To stop just one client specify the RPID (101-106):
 ```
 $DAMS/setup/gfpl/stop_clients.sh -r RPID
 ```
