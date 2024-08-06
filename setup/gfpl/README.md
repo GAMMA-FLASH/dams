@@ -34,7 +34,7 @@ To start all clients:
 ```
 $DAMS/setup/gfpl/startall.sh
 ```
-N.B. logs will be in $DAMS/logs/dl0
+N.B. logs will be in `$DAMS/logs/dl0`
 
 
 To start just one client:
