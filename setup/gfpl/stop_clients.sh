@@ -20,6 +20,28 @@ get_clients_pids() {
     ps aux | grep $PYTHON | grep $GFCL | grep "$X" | grep -v grep | awk '{print $2}'
 }
 
+wait_for_termination() {
+    local pid=$1
+    local timeout_sec=10
+    local timeout=$timeout_sec
+
+    while kill -0 "$pid" 2>/dev/null; do
+        if [ $timeout -le 0 ]; then
+            echo "Process $pid did not terminate in ${timeout_sec} seconds. Sending SIGKILL."
+            kill -9 "$pid"
+            break
+        fi
+        sleep 1
+        timeout=$((timeout - 1))
+    done
+
+    if ! kill -0 "$pid" 2>/dev/null; then
+        echo "Client with PID $pid terminated."
+    else
+        echo "Failed to gracefully terminate Client with PID $pid."
+    fi
+}
+
 terminate_client() {
     local X=$1
 
@@ -31,15 +53,9 @@ terminate_client() {
         for pid in $PIDS; do
             echo "Terminating Client with RPID $X [PID $pid]"
             kill "-${SIGNAL}" "${pid}"
+            wait_for_termination "$pid" &
         done
-        for pid in $PIDS; do
-            # Wait for the process to terminate
-            while kill -0 "$pid" 2>/dev/null; do
-                sleep 1
-                # echo "Waiting for process $pid to terminate..."
-            done
-            echo "Client RPID $X [PID $pid] terminated."
-        done
+        wait
     else
         echo "No matching processes found for RPID $X."
     fi
