@@ -1,6 +1,5 @@
 #!/bin/bash
 
-GFCL=gfcl.py
 PIDS=gfcl.pids
 
 CONDA_ENV_NAME="gammaflash"
@@ -13,6 +12,15 @@ if [ -z "$ODIR" ]; then
     echo "ODIR not defined"
     exit 1
 fi
+
+# Check if DAMS is defined
+if [ -z "$DAMS" ]; then
+    echo "DAMS root not defined"
+    exit 1
+fi
+
+GFCL=${GFCL:-"$DAMS/dl0/gfcl.py"}
+echo "Using Client Script: ${GFCL}"
 
 # Check if gfcl.ini exists
 if [ -e "gfcl.ini" ]; then

@@ -29,6 +29,7 @@ HAS_INFLUX_DB_HK = False
 try:
     from influxdb_client import InfluxDBClient, Point, WriteOptions,WritePrecision
     from influxdb_client.client.write_api import SYNCHRONOUS
+    from influxdb_client.rest import ApiException
     HAS_INFLUX_DB_COUNTS = True
     HAS_INFLUX_DB_HK = True
 except ImportError:
@@ -186,7 +187,14 @@ class Hk:
             .time(timepoint_influx, write_precision_influx)
         )
         
-        write_api.write(bucket=bucket, org=org, record=self._point)        
+        try:
+            write_api.write(bucket=bucket, org=org, record=self._point)        
+        except ApiException as e :
+            print(f"API Exception: {e.status} - {e.reason}", file=sys.stderr)
+        except ConnectionError as e :
+            print(f"Connection Error: {e}", file=sys.stderr)
+        except Exception as e :
+            print(f"An unexpected error occurred: {e}", file=sys.stderr)
 
 class RecvThread(Thread):
 
@@ -292,7 +300,6 @@ class RecvThread(Thread):
 
     def decode_hk(self, header, payload):
         #print('Decode HK')
-        print(len(payload))
         hk = Hk(rpId = self.rpId)
         hk.read_data(payload)
         try:
@@ -424,7 +431,18 @@ class SaveThread(Thread):
                         self._point = Point("RPG%1d" % rpid).field("count", 1).time(time_ms, WritePrecision.MS)
                     else: 
                         self._point.time(time_ms, WritePrecision.MS)
-                    self.write_api.write(self.bucket, self.org, record=self._point)
+                    
+                    try:
+                        self.write_api.write(self.bucket, self.org, record=self._point)
+                    except ApiException as e :
+                        print(f"API Exception: {e.status} - {e.reason}", file=sys.stderr)
+                    except ConnectionError as e :
+                        print(f"Connection Error: {e}", file=sys.stderr)
+                    except Exception as e :
+                        print(f"An unexpected error occurred: {e}", file=sys.stderr)
+
+
+
 
                 self.wform_list.append(packet)
                 self.wform_count += 1
