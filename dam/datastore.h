@@ -10,7 +10,7 @@
 
 #include <cstdint>
 
-#define DS_MAX_NAME_LEN 256
+#define DS_MAX_NAME_LEN 512 
 
 class DataStore {
   
