@@ -31,6 +31,7 @@ else
 fi
 
 # Check if the input is between 101 and 106
+IP_ADDRESS="192.168.166.124"
 
 if [ "$(cat /etc/hostname)" = "gamma-flash.iasfbo.inaf.it" ]; then
     # Source the virtual environment (uncomment if needed)
@@ -42,5 +43,4 @@ else
 fi
 export PYTHONUNBUFFERED=yes
 
-# $PYTHON $GFCL --addr $IP_ADDRESS --port 1234 --outdir $ODIR/RPG$IP_LAST_OCTET/35mV/ --wformno 1000
-$PYTHON $GFCL --addr $1 --port 1234 --outdir $ODIR/RPG202/35mV/ --wformno 1000
+$PYTHON $GFCL --addr $IP_ADDRESS --port 1234 --outdir $ODIR/RPG$IP_LAST_OCTET/35mV/ --wformno 1000
