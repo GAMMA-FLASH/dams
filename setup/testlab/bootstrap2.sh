@@ -12,4 +12,4 @@ bootstrap() {
 EOF
 }
 
-bootstrap $1
+bootstrap "gammasky-rp-dam"
