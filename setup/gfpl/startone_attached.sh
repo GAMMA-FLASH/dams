@@ -30,16 +30,7 @@ else
     exit 1
 fi
 
-# Prompt for the last number of the IP address
-read -p "Enter the last number of the IP address (101-106): " IP_LAST_OCTET
-
-# Check if the input is between 101 and 106
-if [[ $IP_LAST_OCTET -ge 101 && $IP_LAST_OCTET -le 106 ]]; then
-    IP_ADDRESS="192.168.1.$IP_LAST_OCTET"
-else
-    echo "Invalid IP address. Please enter a number between 101 and 106."
-    exit 1
-fi
+IP_ADDRESS=$1
 
 if [ "$(cat /etc/hostname)" = "gamma-flash.iasfbo.inaf.it" ]; then
     # Source the virtual environment (uncomment if needed)
@@ -51,4 +42,5 @@ else
 fi
 export PYTHONUNBUFFERED=yes
 
-$PYTHON $GFCL --addr $IP_ADDRESS --port 1234 --outdir $ODIR/RPG$IP_LAST_OCTET/35mV/ --wformno 1000
+# $PYTHON $GFCL --addr $IP_ADDRESS --port 1234 --outdir $ODIR/RPG$IP_LAST_OCTET/35mV/ --wformno 1000
+$PYTHON $GFCL --addr $IP_ADDRESS --port 1234 --outdir $ODIR/RPG101/35mV/ --wformno 1000
