@@ -542,7 +542,7 @@ class SaveThread(Thread):
             arr._v_attrs.SampleNo = wf.sample_no
             arr._v_attrs.tstart = wf.tstart
             arr._v_attrs.tend = wf.tstop
-            arr[:16384] = np.transpose(np.array([wf.sigr.astype(np.int16)*-1]))[:16384]
+            arr[:16384] = np.transpose(np.array([wf.sigr.astype(np.int16)]))[:16384]
 
         if self.save_hk:
 
