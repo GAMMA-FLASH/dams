@@ -1,4 +1,4 @@
-nohup python3.9 gfcl.py --addr 192.168.1.101 --port 1234 --outdir /archive/DL0c/RPG101/35mV/ --wformno 1000 &
+nohup python3.9 gfcl.py --addr 192.168.1.101 --port 50304 --outdir /archive/DL0c/RPG101/35mV/ --wformno 1000 &
 
 GammaFlash client/server tools.
 
@@ -9,7 +9,7 @@ Usage:
 
 1. Launch the server
 
-python gfse.py --addr 172.17.0.2 --port 1234 --indir /mnt/DL0 --rpid 1
+python gfse.py --addr 172.17.0.2 --port 50304 --indir /mnt/DL0 --rpid 1
 
 2. Define a symbolic link "gfcl.ini" to a gfcl.ini.<target> 
 
@@ -17,4 +17,4 @@ ln -s ./dl0/gfcl.ini.maincomputer ./dl0/gfcl.ini
 
 3. When the server is running launch the client
 
-python gfcl.py --addr 172.17.0.2 --port 1234  --outdir ./test --wformno 10
+python gfcl.py --addr 172.17.0.2 --port 50304  --outdir ./test --wformno 10
