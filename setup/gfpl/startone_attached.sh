@@ -42,5 +42,5 @@ else
 fi
 export PYTHONUNBUFFERED=yes
 
-# $PYTHON $GFCL --addr $IP_ADDRESS --port 1234 --outdir $ODIR/RPG$IP_LAST_OCTET/35mV/ --wformno 1000
-$PYTHON $GFCL --addr $IP_ADDRESS --port 1234 --outdir $ODIR/RPG101/35mV/ --wformno 1000
+# $PYTHON $GFCL --addr $IP_ADDRESS --port 50304 --outdir $ODIR/RPG$IP_LAST_OCTET/35mV/ --wformno 1000
+$PYTHON $GFCL --addr $IP_ADDRESS --port 50304 --outdir $ODIR/RPG101/35mV/ --wformno 1000
