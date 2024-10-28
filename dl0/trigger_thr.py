@@ -1,5 +1,5 @@
 import argparse
-from waveform import twos_comp_to_int, int_to_twos_comp
+from packets.waveform import twos_comp_to_int, int_to_twos_comp
 import sys
 
 MAX_N_ADC = 16383
