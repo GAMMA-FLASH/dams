@@ -107,12 +107,11 @@ while IFS=',' read -r addr port wformno dir_name; do
     # Esecuzione del comando con i parametri letti
     if [ "$BACKGROUND" = true ]; then
         # Lancia in background
-        echo "nohup $PYTHON $GFCL --addr \"$addr\" --port \"$port\" --outdir \"$ODIR/$dir_name/35mV/\" --wformno \"$wformno\" $MULTIPROCESSING > \"$DL0_LOGS/gfcl_$dir_name.log\" &"
+        nohup $PYTHON $GFCL --addr \"$addr\" --port \"$port\" --outdir \"$ODIR/$dir_name/35mV/\" --wformno \"$wformno\" $MULTIPROCESSING > \"$DL0_LOGS/gfcl_$dir_name.log\" &
     elif [ "$ATTACHED_NAME" = "$dir_name" ] || ( [ -z "$ATTACHED_NAME" ] && [ "$dir_name" = "$FIRST_RPG_NAME" ] ); then
         # Lancia in foreground se corrisponde il nome o se ATTACHED_NAME è vuoto e corrisponde al primo RPG
-        echo "$PYTHON $GFCL --addr \"$addr\" --port \"$port\" --outdir \"$ODIR/$dir_name/35mV/\" --wformno \"$wformno\" $MULTIPROCESSING"
-        $PYTHON $GFCL --addr "$addr" --port "$port" --outdir "$ODIR/$dir_name/35mV/" --wformno "$wformno" $MULTIPROCESSING
         echo "Launched RPG: $dir_name"
+        $PYTHON $GFCL --addr "$addr" --port "$port" --outdir "$ODIR/$dir_name/35mV/" --wformno "$wformno" $MULTIPROCESSING
         exit 0 # Esci dopo aver lanciato l'attached process
     fi
 done < "$CONFIG_FILE"
