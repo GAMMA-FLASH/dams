@@ -10,7 +10,7 @@ import time
 import math
 from threading import Thread
 from multiprocessing import JoinableQueue, Process
-from typing import List, Union
+from typing import List, Tuple, Type, Union
 from queue import Queue, Full, Empty
 from time import sleep
 import tables as tb
@@ -29,11 +29,15 @@ from global_config import *
 stopped = multiprocessing.Event()  # Flag per indicare se il processo deve fermarsi
 use_multiprocessing=False
 
-def create_dynamic_class(use_multiprocessing):
-    """Crea una classe dinamica che estende `multiprocessing.Process` o `threading.Thread`."""
-    base_class = Process if use_multiprocessing else Thread
+def conditional_signal_handler(worker_class):
+    if issubclass(worker_class, Process):
+        print("setting signal handler")
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-    class Recv(base_class):
+class BaseWorker:
+    ...
+
+class Recv(BaseWorker):
 
         def __init__(self, queue, sock, crc_table):
 
@@ -50,6 +54,7 @@ def create_dynamic_class(use_multiprocessing):
             self.wform = None
 
         def run(self):
+            conditional_signal_handler(self.__class__)
             while not stopped.is_set():
                 try:
                     data = self.sock.recv(65536)
@@ -155,8 +160,7 @@ def create_dynamic_class(use_multiprocessing):
             except:
                 print("ERROR: Recv: Something went wrong in queue put")
 
-
-    class Save(base_class):
+class Save(BaseWorker):
 
         def __init__(self, queue, outdir, wformno, spectrum_cfg):
             super().__init__()
@@ -216,7 +220,7 @@ def create_dynamic_class(use_multiprocessing):
                 self.org = None
 
         def run(self):
-
+            conditional_signal_handler(self.__class__)
             # Create output directory (if needed)
             os.makedirs(self.outdir, exist_ok=True)
 
@@ -403,6 +407,14 @@ def create_dynamic_class(use_multiprocessing):
             self.wform_list = []
             self.wform_count = 0
 
+def create_dynamic_classes(use_multiprocessing: bool) -> Tuple[Type[Union[Process, Thread]], Type[Union[Process, Thread]]]:
+    """Crea due classi dinamiche che estendono `multiprocessing.Process` o `threading.Thread`."""
+    base_class = Process if use_multiprocessing else Thread
+
+    # Sostituzione della classe base
+    Recv.__bases__ = (base_class,)
+    Save.__bases__ = (base_class,)
+
     return Recv, Save
 
 def start_acquisition(sock, crc_table):
@@ -528,7 +540,7 @@ if __name__ == '__main__':
         
     queue = chosen_queue_type(args.wformno)
 
-    Dyn_Recv , Dyn_Save = create_dynamic_class(use_multiprocessing=use_multiprocessing)
+    Dyn_Recv , Dyn_Save = create_dynamic_classes(use_multiprocessing=use_multiprocessing)
 
     # Stampa il tipo della classe di chosen_queue_type
     print(f"Chosen queue type: {chosen_queue_type.__name__}")
@@ -536,7 +548,7 @@ if __name__ == '__main__':
     print(f"Base class of RecvClass: {Dyn_Recv.__bases__[0].__name__}")
     print(f"Base class of SaveClass: {Dyn_Save.__bases__[0].__name__}")
 
-    save_thread = Dyn_Save(queue, args.outdir, args.wformno, spectrum_cfg)
+    save_thread : Union[Process, Thread] = Dyn_Save(queue, args.outdir, args.wformno, spectrum_cfg)
     save_thread.start()
 
     sleep(1)
@@ -544,7 +556,7 @@ if __name__ == '__main__':
     # Create CRC table
     crc_table = crc32_fill_table(0x05D7B3A1)
 
-    recv_thread = Dyn_Recv( queue, sock, crc_table)
+    recv_thread : Union[Process, Thread] = Dyn_Recv( queue, sock, crc_table)
     recv_thread.start()
 
     # ----------------------------------
