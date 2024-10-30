@@ -3,35 +3,28 @@
 PIDS=gfcl.pids
 DL0_LOGS=$DAMS/logs/dl0
 CONDA_ENV_NAME="gammaflash"
-CONFIG_FILE_NAME_DEF="RPGLIST.cfg"
 
 # Funzione per mostrare l'uso dello script
 usage() {
-    echo "Usage: $0 --config <config_file_or_directory> [--background] [--attached [RPGNAME]] [--multiprocessing]"
+    echo "Usage: $0 [--config <RPG_config_or_directory>] [--background] [--attached [RPGNAME]] [--multiprocessing]"
     exit 1
 }
 
 # Inizializza variabili
-CONFIG_FILE=""
 BACKGROUND=true
 ATTACHED_NAME=""
 MULTIPROCESSING=""
+
+# Se RPG_CONFIG è già definito come variabile d'ambiente, usala come valore predefinito
+# Controllo che RPG_CONFIG sia stato definito, o se esiste già nella variabile d'ambiente
+
+RPG_CONFIG="${RPG_CONFIG:-}"
 
 # Parsing degli argomenti della riga di comando
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --config|-c)
-            if [ -d "$2" ]; then
-                # Se è una directory, controlla se il file di configurazione predefinito esiste
-                if [ -e "$2/$CONFIG_FILE_NAME_DEF" ]; then
-                    CONFIG_FILE="$2/$CONFIG_FILE_NAME_DEF"
-                else
-                    echo "Default config file $CONFIG_FILE_NAME_DEF not found in directory $2."
-                    exit 1
-                fi
-            else
-                CONFIG_FILE="$2"
-            fi
+            RPG_CONFIG="$2"
             shift ;;
         --background|-b) BACKGROUND=true ;;
         --attached|-a)
@@ -48,14 +41,26 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
-# Controllo che CONFIG_FILE sia stato definito
-if [ -z "$CONFIG_FILE" ]; then
-    echo "CONFIG_FILE not defined"
+# Controllo che RPG_CONFIG sia stato definito, o se esiste già nella variabile d'ambiente
+if [ -z "$RPG_CONFIG" ]; then
+    echo "RPG_CONFIG not defined. Please set it as an environment variable or use --config."
     usage
+    exit 1
 fi
+RPG_DEFAULT_FILE="RPGLIST.cfg"
+if [ -d "$RPG_CONFIG" ]; then
+    # Se è una directory, controlla se il file di configurazione predefinito esiste
+    if [ -e "$RPG_CONFIG/$RPG_DEFAULT_FILE" ]; then
+        RPG_CONFIG="$RPG_CONFIG/$RPG_DEFAULT_FILE"
+    else
+        echo "Default config file $RPG_DEFAULT_FILE not found in directory $RPG_CONFIG."
+        exit 1
+    fi
+fi
+# Risolvi il percorso assoluto per RPG_CONFIG
+RPG_CONFIG=$(readlink -f "$RPG_CONFIG")
 
-# Risolvi il percorso assoluto per CONFIG_FILE
-CONFIG_FILE=$(readlink -f "$CONFIG_FILE")
+echo -e "\033[0;32m -- Using Red Pitaya deployment configuration: $RPG_CONFIG\033[0m"
 
 # Check if ODIR is defined
 if [ -z "$ODIR" ]; then
@@ -72,13 +77,14 @@ fi
 mkdir -p "$DL0_LOGS"
 
 GFCL=${GFCL:-"$DAMS/dl0/gfcl.py"}
-echo "Using Client Script: ${GFCL}"
+echo -e "\033[0;32m -- Using Client Script: ${GFCL}\033[0m"
 
 cd "$DAMS/dl0" || exit
 
 # Check if gfcl.ini exists
 if [ -e "gfcl.ini" ]; then
-    echo "Using gfcl.ini: $(readlink -f gfcl.ini)"
+
+    echo -e "\033[0;32m -- Using Gammaflash Client configuration: $(readlink -f gfcl.ini)\033[0m"
 else
     echo "gfcl.ini not defined"
     exit 1
@@ -95,26 +101,26 @@ fi
 FIRST_RPG_NAME=""
 
 # Itera su ogni riga del file di configurazione
-while IFS=',' read -r addr port wformno dir_name; do
+while IFS=',' read -r rp_name addr port wformno || [[ -n "$addr" ]]; do
     # Memorizza il primo RPG
     if [ -z "$FIRST_RPG_NAME" ]; then
-        FIRST_RPG_NAME="$dir_name"
+        FIRST_RPG_NAME="$rp_name"
     fi
 
     # Creazione della directory di output
-    mkdir -p "$ODIR/$dir_name/35mV/"
+    mkdir -p "$ODIR/$rp_name/35mV/"
     
     # Esecuzione del comando con i parametri letti
     if [ "$BACKGROUND" = true ]; then
         # Lancia in background
-        nohup $PYTHON $GFCL --addr "$addr" --port "$port" --outdir "$ODIR/$dir_name/35mV/" --wformno "$wformno" $MULTIPROCESSING > "$DL0_LOGS/gfcl_$dir_name.log" 2>&1 &
-    elif [ "$ATTACHED_NAME" = "$dir_name" ] || ( [ -z "$ATTACHED_NAME" ] && [ "$dir_name" = "$FIRST_RPG_NAME" ] ); then
+        nohup $PYTHON $GFCL --addr "$addr" --port "$port" --outdir "$ODIR/$rp_name/35mV/" --wformno "$wformno" $MULTIPROCESSING > "$DL0_LOGS/gfcl_$rp_name.log" 2>&1 &
+    elif [ "$ATTACHED_NAME" = "$rp_name" ] || ( [ -z "$ATTACHED_NAME" ] && [ "$rp_name" = "$FIRST_RPG_NAME" ] ); then
         # Lancia in foreground se corrisponde il nome o se ATTACHED_NAME è vuoto e corrisponde al primo RPG
-        echo "Launched RPG: $dir_name"
-        $PYTHON $GFCL --addr "$addr" --port "$port" --outdir "$ODIR/$dir_name/35mV/" --wformno "$wformno" $MULTIPROCESSING
+        echo "Launched RPG: $rp_name"
+        $PYTHON $GFCL --addr "$addr" --port "$port" --outdir "$ODIR/$rp_name/35mV/" --wformno "$wformno" $MULTIPROCESSING
         exit 0 # Esci dopo aver lanciato l'attached process
     fi
-done < "$CONFIG_FILE"
+done < "$RPG_CONFIG"
 
 # Se in background, esegui tutti i processi
 if [ "$BACKGROUND" = true ]; then
