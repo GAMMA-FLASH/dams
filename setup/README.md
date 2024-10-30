@@ -30,27 +30,24 @@ RPG List contains one line for each Red Pitaya, with the following informations:
 <rpg_name_x>,<ip address>,<port>,<waveform_number>
 ```
 
-## execute bootstrap2
-install bootstrap 2 in all red pitaya:
+## execute bootstrap
+install `bootstrap2-rp.sh` in all red pitaya:
 ```
-scp $DAMS/setup/gfpl/rp/bootstrap2-rp.sh rp_ip:/root/bootstrap2.sh
+scp $DAMS/setup/gfpl/rp/bootstrap2-rp.sh root@rp_ip:/root/bootstrap2.sh
 ```
 execute:
 ```
-cd $DAMS/setup/gfpl && ./bootstrap2.sh
+cd $DAMS/setup/ && ./bootstrap.sh
 ```
-
 
 ## start the acquisition
 
 To start all clients:
 ```
-$DAMS/setup/start.sh --config $DAMS/setup/<deployment_name> 
+$DAMS/setup/start.sh 
 ```
-for instance, to execute gfpl deployment:
-``
-$DAMS/setup/start.sh --config $DAMS/setup/gfpl
-```
+make sure all envvars are defined
+
 N.B. logs will be in `$DAMS/logs/dl0`
 
 
