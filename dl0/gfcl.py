@@ -448,7 +448,6 @@ DESCRIPTION = 'GammaFlash client v2.0.1'
 
 
 if __name__ == '__main__':
-    signal.signal(signal.SIGINT, signal_handler)
     # ----------------------------------
     # Parse inputs
     # ----------------------------------
@@ -528,7 +527,6 @@ if __name__ == '__main__':
     # ----------------------------------
     # Start client
     # ----------------------------------
-    # Configura il gestore per il segnale SIGINT
     
     chosen_queue_type : Union[JoinableQueue, Queue]= None
 
@@ -542,11 +540,14 @@ if __name__ == '__main__':
 
     Dyn_Recv , Dyn_Save = create_dynamic_classes(use_multiprocessing=use_multiprocessing)
 
-    # Stampa il tipo della classe di chosen_queue_type
+    
     print(f"Chosen queue type: {chosen_queue_type.__name__}")
-    # Stampa il nome della classe base di RecvClass e SaveClass
     print(f"Base class of RecvClass: {Dyn_Recv.__bases__[0].__name__}")
     print(f"Base class of SaveClass: {Dyn_Save.__bases__[0].__name__}")
+
+    # Adapt signal handling to multiprocessing
+
+    signal.signal(signal.SIGINT, signal_handler)
 
     save_thread : Union[Process, Thread] = Dyn_Save(queue, args.outdir, args.wformno, spectrum_cfg)
     save_thread.start()
