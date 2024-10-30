@@ -1,5 +1,15 @@
 #!/bin/bash
 
+build_gfcl_command() {
+    local addr="$1"
+    local port="$2"
+    local rp_name="$3"
+    local wformno="$4"
+
+    # Costruisci e ritorna la stringa del comando
+    echo "$PYTHON $GFCL --addr \"$addr\" --port \"$port\" --outdir \"$ODIR/RPG$rp_name/35mV/\" --wformno \"$wformno\" $MULTIPROCESSING"
+}
+
 PIDS=gfcl.pids
 DL0_LOGS=$DAMS/logs/dl0
 CONDA_ENV_NAME="gammaflash"
@@ -39,13 +49,6 @@ else
     exit 1
 fi
 
-if [ "$(cat /etc/hostname)" = "gamma-flash.iasfbo.inaf.it" ]; then
-    PYTHON=python3.9
-else
-    source activate "$CONDA_ENV_NAME"
-    PYTHON=python
-fi
-
 # Variabile per tenere traccia del primo RPG
 FIRST_RPG_NAME=""
 
@@ -62,12 +65,13 @@ while IFS=',' read -r rp_name addr port wformno || [[ -n "$addr" ]]; do
     # Esecuzione del comando con i parametri letti
     if [ "$BACKGROUND" = true ]; then
         # Lancia in background
-        nohup $PYTHON $GFCL --addr "$addr" --port "$port" --outdir "$ODIR/$rp_name/35mV/" --wformno "$wformno" $MULTIPROCESSING > "$DL0_LOGS/gfcl_$rp_name.log" 2>&1 &
-        log_message "\"$GFCL\" started with --addr "$addr" --port "$port" --outdir "$ODIR/$rp_name/35mV/" --wformno "$wformno" $MULTIPROCESSING. Logs in "$DL0_LOGS/gfcl_$rp_name.log""
+        command_string=$(build_gfcl_command $addr $port $rp_name $wformno)
+        log_message "Client started with: \" $command_string\""
+        nohup bash -c "$command_string" > "$DL0_LOGS/gfcl_RPG$rp_name.log" 2>&1 &
     elif [ "$ATTACHED_NAME" = "$rp_name" ] || ( [ -z "$ATTACHED_NAME" ] && [ "$rp_name" = "$FIRST_RPG_NAME" ] ); then
         # Lancia in foreground se corrisponde il nome o se ATTACHED_NAME è vuoto e corrisponde al primo RPG
         echo "Launched RPG: $rp_name"
-        $PYTHON $GFCL --addr "$addr" --port "$port" --outdir "$ODIR/$rp_name/35mV/" --wformno "$wformno" $MULTIPROCESSING
+        eval $(build_gfcl_command "$addr" "$port" "$rp_name" "$wformno")
         exit 0 # Esci dopo aver lanciato l'attached process
     fi
 done < "$RPG_CONFIG"

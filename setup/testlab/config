@@ -1,4 +1,0 @@
-Host gammasky-rp-dam
-  HostName 192.168.166.127
-  IdentityFile ~/.ssh/id_rsa
-  User root

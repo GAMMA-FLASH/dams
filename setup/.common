@@ -66,3 +66,12 @@ fi
 export RPG_CONFIG=$(readlink -f "$RPG_CONFIG")
 
 echo -e "\033[0;32m -- Using Red Pitaya deployment configuration: $RPG_CONFIG\033[0m"
+
+if [ "$(cat /etc/hostname)" = "gamma-flash.iasfbo.inaf.it" ]; then
+    PYTHON=python3.9
+else
+    source activate "$CONDA_ENV_NAME"
+    PYTHON=python
+fi
+log_message "Using python executable: \"$PYTHON\""
+echo 
