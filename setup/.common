@@ -1,0 +1,68 @@
+#!/bin/bash
+
+log_message() {
+    local message="$1"
+    echo -e "\e[33m[INFO] \e[0m$message"
+}
+
+# Funzione per mostrare l'uso dello script
+usage() {
+    echo "Usage: $0 [--config <RPG_config_or_directory>] [--background] [--attached [RPGNAME]] [--multiprocessing]"
+    exit 1
+}
+
+# Inizializza variabili
+BACKGROUND=true
+ATTACHED_NAME=""
+MULTIPROCESSING=""
+
+# Se RPG_CONFIG è già definito come variabile d'ambiente, usala come valore predefinito
+# Controllo che RPG_CONFIG sia stato definito, o se esiste già nella variabile d'ambiente
+
+RPG_CONFIG="${RPG_CONFIG:-}"
+# Controlla se RPG_CONFIG è definita e stampa un messaggio informativo
+if [ -n "$RPG_CONFIG" ]; then
+    log_message "RPG_CONFIG is set to: $RPG_CONFIG"
+fi
+
+# Parsing degli argomenti della riga di comando
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --config|-c)
+            RPG_CONFIG="$2"
+            shift ;;
+        --background|-b) BACKGROUND=true ;;
+        --attached|-a)
+            BACKGROUND=false
+            ATTACHED_NAME="$2"
+            if [ -z "$ATTACHED_NAME" ]; then
+                # Se ATTACHED_NAME è vuoto, impostalo al primo RPG della lista
+                ATTACHED_NAME=""
+            fi
+            shift ;;
+        --multiprocessing|-m) MULTIPROCESSING="--multiprocessing" ;;
+        *) echo "Unknown parameter passed: $1"; usage ;;
+    esac
+    shift
+done
+
+# Controllo che RPG_CONFIG sia stato definito, o se esiste già nella variabile d'ambiente
+if [ -z "$RPG_CONFIG" ]; then
+    echo -e "\e[31mERROR: RPG_CONFIG not defined. Please set it as an environment variable or use --config.\e[0m"
+    usage
+    exit 1
+fi
+RPG_DEFAULT_FILE="RPGLIST.cfg"
+if [ -d "$RPG_CONFIG" ]; then
+    # Se è una directory, assegna file di configurazione predefinito
+    RPG_CONFIG="$RPG_CONFIG/$RPG_DEFAULT_FILE"
+fi
+if [ ! -e "$RPG_CONFIG" ]; then
+    echo -e "\e[31mERROR: Config file $RPG_CONFIG does not exist.\e[0m"
+    usage
+    exit 1
+fi
+# Risolvi il percorso assoluto per RPG_CONFIG
+export RPG_CONFIG=$(readlink -f "$RPG_CONFIG")
+
+echo -e "\033[0;32m -- Using Red Pitaya deployment configuration: $RPG_CONFIG\033[0m"
