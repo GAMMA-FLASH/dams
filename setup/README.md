@@ -29,6 +29,8 @@ RPG List contains one line for each Red Pitaya, with the following informations:
 ```
 <rpg_name_x>,<ip address>,<port>,<waveform_number>
 ```
+for gfcl, RPID is (101-106)
+for testlab, RPID is SIPM
 
 ## execute bootstrap
 install `bootstrap2-rp.sh` in all red pitaya:
@@ -61,10 +63,10 @@ $DAMS/setup/start.sh --config $DAMS/setup/<deployment_name> -a <RPGNAME>
 
 To stop all clients:
 ```
-$DAMS/setup/gfpl/stop_clients.sh
+$DAMS/setup/stop_clients.sh
 ```
 
-To stop just one client specify the RPID (101-106):
+To stop just one client specify the RPGNAME
 ```
-$DAMS/setup/gfpl/stop_clients.sh -r RPID
+$DAMS/setup/stop_clients.sh -a <RPGNAME>
 ```
