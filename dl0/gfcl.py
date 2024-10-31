@@ -1,4 +1,5 @@
 import os
+import gc
 import signal
 import sys
 import subprocess
@@ -9,6 +10,7 @@ import threading
 import time
 import math
 from threading import Thread
+import multiprocessing
 from multiprocessing import JoinableQueue, Process
 from typing import List, Tuple, Type, Union
 from queue import Queue, Full, Empty
@@ -16,22 +18,38 @@ from time import sleep
 import tables as tb
 import numpy as np
 import configparser
-import gc
+
 from enum import Enum
+import influx_utils as influx
 
 from pathlib import Path
 
 from packets import Waveform, Hk, Event
 from crc32 import crc32_fill_table, crc32
 
-from global_config import *
+# ------------------------------------------------------------------ #
+# Load influx DB modules                                             #
+# ------------------------------------------------------------------ #
+
+try:
+    from influxdb_client import InfluxDBClient, Point, WriteOptions,WritePrecision
+    from influxdb_client.client.write_api import SYNCHRONOUS
+    from influxdb_client.rest import ApiException
+    influx.HAS_INFLUX_DB_COUNTS = True
+    influx.HAS_INFLUX_DB_HK = True
+except ImportError:
+    print("Influx modules not found") 
+    pass
+
+print("gc enabled: ", gc.isenabled())
 
 stopped = multiprocessing.Event()  # Flag per indicare se il processo deve fermarsi
+stop_save = multiprocessing.Event()  # Flag per indicare se il processo deve fermarsi
 use_multiprocessing=False
+
 
 def conditional_signal_handler(worker_class):
     if issubclass(worker_class, Process):
-        print("setting signal handler")
         signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 class BaseWorker:
@@ -65,6 +83,7 @@ class Recv(BaseWorker):
                     self.proc_bytes(data)
                 except:
                     print("ERROR: Recv: Byte processing error %d" % len(data))
+            print("Recv Exited")
 
         def proc_bytes(self, data):
             self.data += data
@@ -190,11 +209,11 @@ class Save(BaseWorker):
             # Setup influx DB                                                    #
             # ------------------------------------------------------------------ #
 
-            if HAS_INFLUX_DB_COUNTS or HAS_INFLUX_DB_HK :
-                self.org = INFLUX_DB_ORG
-                self.client = InfluxDBClient(url=INFLUX_DB_URL, token=INFLUX_DB_TOKEN, org=self.org)
-                if HAS_INFLUX_DB_COUNTS : 
-                    self.bucket = INFLUX_DB_BUCKET
+            if influx.HAS_INFLUX_DB_COUNTS or influx.HAS_INFLUX_DB_HK :
+                self.org = influx.INFLUX_DB_ORG
+                self.client = InfluxDBClient(url=influx.INFLUX_DB_URL, token=influx.INFLUX_DB_TOKEN, org=self.org)
+                if influx.HAS_INFLUX_DB_COUNTS : 
+                    self.bucket = influx.INFLUX_DB_BUCKET
                     self.write_api = self.client.write_api(write_options=WriteOptions(batch_size=100,
                                                         flush_interval=1_000,
                                                         jitter_interval=2_000,
@@ -206,9 +225,9 @@ class Save(BaseWorker):
                     self.bucket = None
                     self.write_api = None
 
-                if HAS_INFLUX_DB_HK :
+                if influx.HAS_INFLUX_DB_HK :
                     self.write_api_hk = self.client.write_api(write_options=SYNCHRONOUS)
-                    self.bucketHk = INFLUX_DB_BUCKET_HK
+                    self.bucketHk = influx.INFLUX_DB_BUCKET_HK
                 else:
                     self.bucketHk = None
                     self.write_api_hk = None
@@ -224,7 +243,7 @@ class Save(BaseWorker):
             # Create output directory (if needed)
             os.makedirs(self.outdir, exist_ok=True)
 
-            while not stopped.is_set() or self.queue.qsize() != 0:
+            while not stop_save.is_set() or self.queue.qsize() != 0:
 
                 try:
 
@@ -249,7 +268,7 @@ class Save(BaseWorker):
                 elif type(packet) is Hk:
                     #print('Save HK')
                     packet.print()
-                    if HAS_INFLUX_DB_HK:
+                    if influx.HAS_INFLUX_DB_HK:
                         packet.influx(self.write_api_hk, self.bucketHk, self.org) 
                     self.hk_list.append(packet)
                 else:
@@ -258,10 +277,10 @@ class Save(BaseWorker):
                     # Send data to influx DB                                             #
                     # ------------------------------------------------------------------ #
 
-                    if HAS_INFLUX_DB_COUNTS:
+                    if influx.HAS_INFLUX_DB_COUNTS:
                     
 
-                        if INFLUX_WF_TIMESTAMP == TimestampOptions.RedPitaya: 
+                        if influx.INFLUX_WF_TIMESTAMP == TimestampOptions.RedPitaya: 
                             time_ms = math.trunc((packet.tstart) * 1000) 
                         else: 
                             time_ms = math.trunc(time.time() * 1000) 
@@ -301,10 +320,10 @@ class Save(BaseWorker):
                 # if self.wform_count % 10 == 0:
                 #     print(f"DEBUG - Queued packets: {self.queue.qsize()}, processed packets: {self.wform_count}")
                 
-            if HAS_INFLUX_DB_COUNTS or HAS_INFLUX_DB_HK:
-                if HAS_INFLUX_DB_COUNTS :
+            if influx.HAS_INFLUX_DB_COUNTS or influx.HAS_INFLUX_DB_HK:
+                if influx.HAS_INFLUX_DB_COUNTS :
                     self.write_api.close()
-                if HAS_INFLUX_DB_HK : 
+                if influx.HAS_INFLUX_DB_HK : 
                     self.write_api_hk.close()
                 self.client.close()
             
@@ -465,7 +484,7 @@ if __name__ == '__main__':
 
     print(DESCRIPTION)
 
-    if not HAS_INFLUX_DB_HK or not HAS_INFLUX_DB_COUNTS:
+    if not influx.HAS_INFLUX_DB_HK or not influx.HAS_INFLUX_DB_COUNTS:
         print("INFO: Main: No influx DB module found")
 
     # ----------------------------------
@@ -473,32 +492,7 @@ if __name__ == '__main__':
     # ----------------------------------
     cfg = configparser.ConfigParser()
     cfg.read('gfcl.ini')
-    if HAS_INFLUX_DB_HK or HAS_INFLUX_DB_COUNTS:
-        if cfg['INFLUXDB'].getboolean('Enable_Counts') or cfg['INFLUXDB'].getboolean('Enable_Hk'):
-            print("INFO: Main: load influx DB connection pramaters")
-            INFLUX_DB_URL = cfg['INFLUXDB'].get("URL")
-            INFLUX_DB_TOKEN = cfg['INFLUXDB'].get("Token")
-            INFLUX_DB_ORG = cfg['INFLUXDB'].get("Org")
-            if cfg['INFLUXDB'].getboolean('Enable_Counts') :
-                print("Counts enabled")
-                INFLUX_DB_BUCKET = cfg['INFLUXDB'].get("Bucket")
-            else: 
-                HAS_INFLUX_DB_COUNTS = False
-            if cfg['INFLUXDB'].getboolean('Enable_Hk') :
-                print("Housekeeping enabled")
-                INFLUX_DB_BUCKET_HK = cfg['INFLUXDB'].get("BucketHk")
-            else:
-                HAS_INFLUX_DB_HK = False
-            try:
-                INFLUX_WF_TIMESTAMP = TimestampOptions(cfg['INFLUXDB'].get("Timestamp_Wf"))
-                print(f"Timestamp to load to influx set to: {INFLUX_WF_TIMESTAMP}")
-                INFLUX_HK_TIMESTAMP = TimestampOptions(cfg['INFLUXDB'].get("Timestamp_Hk"))
-                print(f"Timestamp to load to influx set to: {INFLUX_HK_TIMESTAMP}")
-            except ValueError as e:
-                print(f"WARNING: Cannot set 'TIMESTAMP' option: {e}. Using default value {TimestampOptions.MainComputer}")
-        else:
-            HAS_INFLUX_DB_HK = False
-            HAS_INFLUX_DB_COUNTS = False
+    influx.parse_influx_params(cfg)
     
     spectrum_cfg={
             'Enable' : cfg['SPECTRUM_AN'].getboolean('Enable'),
@@ -585,7 +579,7 @@ if __name__ == '__main__':
 
     print('INFO: Main: Wait till data saving is complete')
     queue.join()
-
+    stop_save.set()
     print('INFO: Main: Stop save thread')
     save_thread.join()
 
