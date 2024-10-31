@@ -2,11 +2,12 @@ import math
 import struct
 import sys
 import time
-import global_config
+import influx_utils
 
 try:
     from influxdb_client import Point, WritePrecision
-    from influxdb_client.rest import ApiException
+    from influxdb_client.rest import ApiException	
+    from influxdb_client.client.exceptions import InfluxDBError
 except ImportError:
     print("Influx modules not found") 
     pass
@@ -117,7 +118,7 @@ class Hk:
         gps_invalid_time = 1 if self.flags & 0x10 else 0
         err = 1 if self.flags & 0x01 else 0
 
-        if global_config.INFLUX_HK_TIMESTAMP == global_config.TimestampOptions.MainComputer:
+        if influx_utils.INFLUX_HK_TIMESTAMP == influx_utils.TimestampOptions.MainComputer:
             timepoint_influx = math.trunc(self.trx * 1000)
             write_precision_influx=WritePrecision.MS
         else:
