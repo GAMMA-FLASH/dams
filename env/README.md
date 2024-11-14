@@ -32,7 +32,14 @@ gammaflash-env
     docker build -t dams_image:1.6.0 .
     ```
 
-* Run container (without `--rm` for not auto-remove container after disconnection)
-    ```
-    docker run --rm -it -v /Users/riccardofalco/Downloads/dams:/home/gamma/workspace/dams  -v /Users/riccardofalco/Downloads/Data/DL0:/home/gamma/workspace/Data/DL0  -v /Users/riccardofalco/Downloads/Data/DL1:/home/gamma/workspace/Data/DL1 -v /Users/riccardofalco/Downloads/Data/DL2:/home/gamma/workspace/Data/DL2 -v /Users/riccardofalco/Downloads/Out/json:/home/gamma/workspace/Data/Out/json -v /Users/riccardofalco/Downloads/Out/logs:/home/gamma/workspace/Data//Out/logs --name dams_cont dams_image:latest /bin/bash
-    ```
+----- entrypoint with jupyter start -----
+Starts jupyter in the entrypoint and defines in bashrc the envvars DAMS, RPG_CONFIG
+
+docker run -it -d \ 
+    -v /data02/:/data02/ -v /data01/:/data01/ -v /home/user/dams:/home/usergamma/dams \
+    --entrypoint /home/usergamma/dams/env/entrypoint.sh \ 
+    -e DAMS=/home/usergamma/dams -e RPG_CONFIG=/home/usergamma/dams/setup/<CHOOSE_SETUP_HERE> \
+    -p 8095:8888 --name gsky \
+    gammaflash:1.5.0_gammasky /bin/bash
+
+-----------------------------------------
