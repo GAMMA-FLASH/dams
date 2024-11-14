@@ -58,9 +58,6 @@ while IFS=',' read -r rp_name addr port wformno || [[ -n "$addr" ]]; do
     if [ -z "$FIRST_RPG_NAME" ]; then
         FIRST_RPG_NAME="$rp_name"
     fi
-
-    # Creazione della directory di output
-    mkdir -p "$ODIR/$rp_name/35mV/"
     
     # Esecuzione del comando con i parametri letti
     if [ "$BACKGROUND" = true ]; then
