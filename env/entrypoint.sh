@@ -1,5 +1,9 @@
 #!/bin/bash
 
+echo "Input envvars:"
+echo "DAMS: $DAMS"
+echo "RPG_CONFIG: $RPG_CONFIG"
+
 # Nome del vecchio e del nuovo ambiente
 condaenviron="gammaflash"
 cd $HOME
@@ -10,6 +14,7 @@ source activate $condaenviron
 
 TOKEN="gf2023#"
 
+
 echo "starting notebook. Use Token: $TOKEN"
 # Avviare il notebook Jupyter, legandolo a tutte le interfacce di rete e mettendo i log su stdout
 nohup jupyter-lab --ip="*" --no-browser --autoreload --NotebookApp.token="$TOKEN" --notebook-dir=/home/usergamma/dams --allow-root > /dev/stdout 2>&1 &
@@ -17,8 +22,8 @@ nohup jupyter-lab --ip="*" --no-browser --autoreload --NotebookApp.token="$TOKEN
 # Verifica se le variabili sono già presenti
 if ! grep -q "export DAMS=" ~/.bashrc; then
     echo "exporting variables"
-    echo 'export DAMS="/home/usergamma/dams"' >> ~/.bashrc
-    echo 'export RPG_CONFIG="$DAMS/setup/testlab"' >> ~/.bashrc
+    echo "export DAMS=${DAMS:-/home/usergamma/dams}" >> ~/.bashrc
+    echo "export RPG_CONFIG=${RPG_CONFIG:-$DAMS/setup/testlab}" >> ~/.bashrc
 else
     echo "Le variabili di ambiente sono già presenti in .bashrc."
 fi
