@@ -8,3 +8,5 @@ pipe/test
 nohup.out
 *.txt
 *.log
+.ipynb_checkpoints
+.Trash-*
