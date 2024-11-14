@@ -46,3 +46,15 @@ or define ODIR variable
 
 ## Jupiter
 nohup jupyter-lab --ip="*" --port 8001 --no-browser --autoreload --NotebookApp.token='gf2023#'  --notebook-dir=/home/usergamma/workspace --allow-root > jupyterlab_start.log 2>&1 &
+
+
+## Vscode config 
+Copy this config inside `.vscode/` folder to exploit autocompletion:
+
+```
+{
+    "files.exclude": {
+        "**/.idea": true
+    }
+}
+```
