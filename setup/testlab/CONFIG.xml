@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<DAM version="02.04.0000" apid="01" damSessionID="00" configID="00" />
+<Configuration monitorPeriodSecs="0005" sendWform="yes" saveWform="no" saveWformNo="100" />
+<Oscilloscope eqLevel="02" decimation="0001" trigSource="02" trigThresh="16219" trigHyst="000004" trigDelay="10240" trigDebounce="000005" />
