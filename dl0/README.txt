@@ -18,3 +18,5 @@ ln -s ./dl0/gfcl.ini.maincomputer ./dl0/gfcl.ini
 3. When the server is running launch the client
 
 python gfcl.py --addr 172.17.0.2 --port 50304  --outdir ./test --wformno 10
+
+to start it with multiprocessing capabilities, use `--multiprocessing` arg.

@@ -9,7 +9,6 @@ export GF_NAME="gf_${PROJECT}"
 export GF_IMAGE="gammaflash:1.5.0_${USER}"
 
 export INFLUX_DATA="/data01/archive/gammasky/influx/data"
-export DATA01="/data01/archive/gammasky/data"
-export DATA02="/data02/"
+
 
 set +v

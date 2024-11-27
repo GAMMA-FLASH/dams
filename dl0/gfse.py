@@ -11,7 +11,7 @@ from threading import Thread
 
 import h5py
 
-from waveform import Waveform, int_to_twos_comp
+from packets.waveform import Waveform, int_to_twos_comp
 from crc32 import crc32_fill_table, crc32
 
 
