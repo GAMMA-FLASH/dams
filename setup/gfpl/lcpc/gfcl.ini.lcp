@@ -6,10 +6,13 @@ Test = no
 Enable_Counts = yes
 Enable_Hk = yes
 URL = 172.17.0.1:8086
-Token = 8J4gOVenyRRCYb15eTyjFJbMytkE3ICRflBp43e4tJpV7leOJ8vA9VSAJru_mpCaAPZNhVfUjhRolrhfJe5BTQ==
+Token = U-zc-DjhqfbbsnZ5gwCJimyfYB11TcSYQu6sI2DKDcXzLidH7M32lNYXVtZ7Z_Gl36m2zaCd00-yCB8C4S23pg==
 Org = GAMMA-FLASH
 Bucket = RP-COUNTS
 BucketHk = HK
+# Determine the timestamp used to create the point in the InfluxDB. Options: 'RP' to use tstart from the waveform. 'MC' to sample the time from main computer.
+Timestamp_Wf = MC 
+Timestamp_Hk = RP
 
 [SPECTRUM_AN]
 Enable = yes

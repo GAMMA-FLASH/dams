@@ -3,17 +3,15 @@
 #include <time.h>
 #include <errno.h>
 
-#include "config.h"
-#include "trace.h"
+//#include "config.h"
+//#include "trace.h"
 
-#include "globals.h"
+//#include "globals.h"
 
 #include "hk_fpga.h"
 #include "uart.h"
 
 #include "tstamp.h"
-
-#define TH_MINUTES 20
 
 static uint32_t m_status;
 
@@ -30,17 +28,11 @@ pthread_mutex_t m_tstamp_lock;
 
 static inline uint32_t delta_nsec(const struct timespec *t1, const struct timespec *t0) {
 	uint32_t dsec = t1->tv_sec - t0->tv_sec;
-	int32_t dnsec = t1->tv_nsec - t0->tv_nsec;
-	if (dsec > 0 ){
-		if (dsec > 2){
-			dsec = 2000000000U;
-		}
-		else{
-			dsec = dsec * 1000000000U;
-		}
-		dsec += (uint32_t) dnsec;
+	uint32_t dnsec = t1->tv_nsec - t0->tv_nsec;
+	if (dsec > 0) {
+		dnsec += 1000000000;
 	}
-	return (uint32_t) dsec; 
+	return dnsec; 
 }
 
 static inline void delta_time(const struct timespec *t1, const struct timespec *t0, struct timespec *dt) {
@@ -57,26 +49,14 @@ static inline void delta_time(const struct timespec *t1, const struct timespec *
 }
 
 static inline int pps_wait() {
-	int count = 0;
-	uint32_t state, old_state = 0x0000 ;
-	for(int i = 0; i < 150000; i++) {
-		state = g_hk_fpga_reg_mem->in_p & HK_FPGA_GPIO_BIT7;
-		//printf("The state of the register is %d\n",  state);
-		if ( state != old_state ) {
-			//clock_gettime(CLOCK_REALTIME, &m_pps_ts);
-			//printf("PPS updated at %d iteration. state: %d, old: %d \n", count, state, old_state);
-			old_state = state;
-			if (i > 0) { //If PPS does not change from 1, then PPS is not active
-				clock_gettime(CLOCK_REALTIME, &m_pps_ts);
-			    // printf("PPS updated at %d iteration. state: %d, old: %d \n", count, state, old_state);	
-				return 0;
-			}	
+	for(int i = 0; i < 500000; i++) {
+		if (g_hk_fpga_reg_mem->in_p & HK_FPGA_GPIO_BIT7) {
+			clock_gettime(CLOCK_REALTIME, &m_pps_ts);
+			return 0;
 		} else {
-			count++;
 			usleep(5);
 		}
 	}
-	// printf("value of PPS checked: %d times\n", count);
 	return -1;
 }
 
@@ -88,22 +68,11 @@ void *ppsAcqThreadFcn(void *ptr) {
         int res = pps_wait();
         if (res == 0) { // PPS found wait till the next one
         	m_status &= ~(uint32_t)TimeStamp::TS_NOPPS;
-			g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_PPS_NOK);
-			// printf("PPS received\n");
         	usleep(750000);
         } else { // No signal/fix from PPS
-        	m_status += (uint32_t)TimeStamp::TS_NOPPS;
-			g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_PPS_NOK);
-			// printf("PPS not received\n");
+        	m_status |= (uint32_t)TimeStamp::TS_NOPPS;
         	sleep(1);
         }
-/*
-	if (m_status) {
-		g_systemInfo.flags |= (uint8_t)m_status;
-	} else {
-		g_systemInfo.flags &= ~(uint8_t)(TimeStamp::TS_NOPPS+TimeStamp::TS_NOUART);
-	}
-*/
     }
     
     // This point should never be reached
@@ -132,10 +101,9 @@ static inline void gga_read() {
 							clock_gettime(CLOCK_REALTIME, &m_gga_ts);
 							
 							uint32_t dnsec = delta_nsec(&m_gga_ts, &m_pps_ts);
-							if (dnsec < 1000000000) {
-								printf("delta sec between current OS and PPS sampled time is lower than 1s: %u ns \n", dnsec);
             				
-								g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_OVERTIME);
+            				if (dnsec < 1000000000) {
+								
 								pthread_mutex_lock(&m_tstamp_lock);
 
 								m_tstamp_ts.tv_sec = m_pps_ts.tv_sec;
@@ -146,35 +114,9 @@ static inline void gga_read() {
 								m_tstamp_ss = (uint32_t)(g_uart_buff[11]-'0')*10 + (uint32_t)(g_uart_buff[12]-'0');
 								m_tstamp_us = (uint32_t)(g_uart_buff[14]-'0')*100000 + (uint32_t)(g_uart_buff[15]-'0')*10000 + (uint32_t)(g_uart_buff[16]-'0');
 								
-								time_t rawtime;
-								struct tm *timeinfo;
-    							time(&rawtime);
-								timeinfo = localtime(&rawtime);
-								int current_hour = timeinfo->tm_hour;
-								int current_minute = timeinfo->tm_min;
-
-								// Compare parsed time with system time
-								int minute_difference = (m_tstamp_hh * 60 + m_tstamp_mm) - (current_hour * 60 + current_minute);
-								int threshold_minutes = TH_MINUTES;  // Set the threshold range of minutes
-								
-								if (abs(minute_difference) > threshold_minutes) {
-									printf("Error: System time is not within %d minutes of GNGGA time: current %d:%d ; gps %d:%d\n", threshold_minutes, current_hour, current_minute, m_tstamp_hh, m_tstamp_mm );
-									g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_NOTIME);
-								} else {
-									printf("System time is within %d minutes of GNGGA time. difference %d min\n", threshold_minutes, minute_difference);
-									g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_NOTIME);
-								}
-
-								//printf("%02X %s\n", m_status, g_uart_buff);
-
 								pthread_mutex_unlock(&m_tstamp_lock);
 								
 							} 
-							else {
-								printf("not checking time. delta sec between current OS and PPS sampled time is greater than 1s: %u ns \n", dnsec);
-								g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_OVERTIME);
-								g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_NOTIME);
-							}
 							
 						}
 					
@@ -198,13 +140,9 @@ void *ggaAcqThreadFcn(void *ptr) {
         int res = uart_read();
         if (res > 0) { // Search GGA sentence 
         	m_status &= ~(uint32_t)TimeStamp::TS_NOUART;
-			g_systemInfo.flags &= ~((uint32_t)SystemInfo::FLG_GPS_NOUART);
         	gga_read();
         } else {	// No data from UART
-        	m_status += (uint32_t)TimeStamp::TS_NOUART;
-			g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_NOUART);
-			g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_NOTIME);
-			g_systemInfo.flags |= ((uint32_t)SystemInfo::FLG_GPS_OVERTIME);
+        	m_status |= (uint32_t)TimeStamp::TS_NOUART;
         	sleep(1);
         }
     }

@@ -5,8 +5,6 @@
 #include <errno.h>
 
 #include "uart.h"
-#include <cstring> 
-#include <sys/select.h> // Include for select
 
 int g_uart_fd = -1;
 int g_uart_nbytes = -1;
@@ -80,39 +78,13 @@ int uart_uninit() {
 }
 
 int uart_read() {
-    if (g_uart_fd < 0) {
-        return -1;
-    }
+	
+	if (g_uart_fd < 0) {
+		return -1;
+	}
+	
+	g_uart_nbytes = ::read(g_uart_fd, (void*)g_uart_buff, g_uart_buff_sz);
+	
+	return g_uart_nbytes;
 
-    fd_set read_fds;
-    FD_ZERO(&read_fds);
-    FD_SET(g_uart_fd, &read_fds);
-
-    struct timeval timeout;
-    timeout.tv_sec = 5;  // Timeout di 1 secondo
-    timeout.tv_usec = 0;
-
-    int ret = select(g_uart_fd + 1, &read_fds, NULL, NULL, &timeout);
-
-    if (ret > 0) {
-        if (FD_ISSET(g_uart_fd, &read_fds)) {
-            g_uart_nbytes = ::read(g_uart_fd, (void*)g_uart_buff, g_uart_buff_sz);
-
-            if (g_uart_nbytes < 0) {
-                // An actual error occurred
-                fprintf(stderr, "UART read error: %s\n", strerror(errno));
-                return -1;
-            }
-            return g_uart_nbytes;
-        }
-    } else if (ret == 0) {
-        // Timeout, senza dati
-        return -1;
-    } else {
-        // Errore nella chiamata select
-        fprintf(stderr, "Select error: %s\n", strerror(errno));
-        return -1;
-    }
-
-    return 0;
 }

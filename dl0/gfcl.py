@@ -7,12 +7,15 @@ import socket
 import time
 import math
 from threading import Thread
+from typing import List
 from queue import Queue, Full, Empty
 from time import sleep
 import tables as tb
 import numpy as np
 import configparser
 import gc
+from enum import Enum
+
 from pathlib import Path
 
 from waveform import Waveform
@@ -26,6 +29,7 @@ HAS_INFLUX_DB_HK = False
 try:
     from influxdb_client import InfluxDBClient, Point, WriteOptions,WritePrecision
     from influxdb_client.client.write_api import SYNCHRONOUS
+    from influxdb_client.rest import ApiException
     HAS_INFLUX_DB_COUNTS = True
     HAS_INFLUX_DB_HK = True
 except ImportError:
@@ -40,14 +44,26 @@ INFLUX_DB_TOKEN = None
 INFLUX_DB_ORG = None
 INFLUX_DB_BUCKET = None
 INFLUX_DB_BUCKET_HK = None
+class TimestampOptions(Enum):
+    RedPitaya = 'RP'  # Use tstart from the waveform
+    MainComputer = 'MC'  # Sample the time from the main computer
+INFLUX_WF_TIMESTAMP : TimestampOptions = TimestampOptions.MainComputer
+INFLUX_HK_TIMESTAMP : TimestampOptions = TimestampOptions.MainComputer
 
 def trx_to_str(trx):
     ts = time.gmtime(trx)
-    str1 = time.strftime("%Y%m%dT%H:%M:%S", ts)
+    str1 = time.strftime("%Y%m%d-%H:%M:%S", ts)
     sns = math.modf(trx)
     usec = round(sns[0] * 1e6)
     str2 = '%06d' % usec
-    return str1 + "." + str2
+    return "[Hk - MC time]" + str1 + "." + str2
+
+def tmstp_to_str(tmstp):
+    ts = time.gmtime(tmstp[0])
+    str1 = time.strftime("%Y%m%d-%H:%M:%S", ts)
+    nsec = tmstp[1]
+    str2 = '%06d' % nsec
+    return "[Hk - RP time]" + str1 + "." + str2
 
 print("gc enabled: ", gc.isenabled())
 class Event:
@@ -64,13 +80,12 @@ class Event:
 
 
 class Hk:
-    def __init__(self, rpId=None, trx=None):
+    def __init__(self, rpId=None):
         self.rpId = rpId
         # Receive time in secs past January 1, 1970, 00:00:00 (UTC)
-        if trx is None:
-            self.trx = time.time()
-        else:
-            self.trx = trx
+        
+        self.trx = time.time() #save instantiation time
+        self.tstmp = None
 
         self.state = 0
         self.flags = 0
@@ -84,16 +99,31 @@ class Hk:
         # [2] State (uint8) 0x02 = SERVICE 0x03 ACQUISITION
         # [3] Flags (uint8) 0x80 = PPS_NOK 0x40 = GPS_NOK 0x20 = TRIG_ERR (no events)
         # [4] WaveCount (uint32)
+        # [8] Timestamp (2*uint32)
         # Add temperature??
         self.state = struct.unpack('<B', raw[2:3])[0]
         self.flags = struct.unpack('<B', raw[3:4])[0]
-        self.wform_count = struct.unpack('<I', raw[4:])[0]
+        self.wform_count = struct.unpack('<I', raw[4:8])[0]
+        if len(raw) > 8:  ##for backward compatibility
+
+            self.tstmp = struct.unpack("<LL", raw[8:])  # timespec sec.nsec
+        
+    def compute_time(self):
+        return float(self.tstmp[0]) + float(self.tstmp[1]) * 1e-9
+    
+    def timestamp_found(self):
+        return True if self.tstmp is not None else False
 
     def print(self):
         #print("    State: %02X" % self.state)
         #print("    Flags: %02X" % self.flags)
         #print("Wform no.: %d" % self.wform_count)
-        msg = trx_to_str(self.trx) + ' '
+        msg = ''
+        if self.tstmp is None:
+            msg = trx_to_str(self.trx)
+        else : 
+            msg = tmstp_to_str(self.tstmp)
+        msg += ' '
         if self.state == 0x02:
             msg += 'SRV'
         elif self.state == 0x03:
@@ -105,10 +135,18 @@ class Hk:
         else:
             msg += ' _'
         if self.flags & 0x40:
-            msg += 'G'
+            msg += 'Gu'
         else:
-            msg += '_'
+            msg += '__'
         if self.flags & 0x20:
+            msg += 'Go'
+        else:
+            msg += '__'
+        if self.flags & 0x10:
+            msg += 'Gt'
+        else:
+            msg += '__'
+        if self.flags & 0x01:
             msg += 'T'
         else:
             msg += '_'
@@ -120,24 +158,43 @@ class Hk:
         #print("    Flags: %02X" % self.flags)
         #print("Wform no.: %d" % self.wform_count)
 
-        time_ms = math.trunc(self.trx * 1000)
         measurement_name = f"RPG{self.rpId}"
-        
-        pps = 1 if self.flags & 0x80 else 0
-        gps = 1 if self.flags & 0x40 else 0
-        err = 1 if self.flags & 0x20 else 0
 
+        pps = 1 if self.flags & 0x80 else 0
+        gps_no_uart = 1 if self.flags & 0x40 else 0
+        gps_overtime = 1 if self.flags & 0x20 else 0
+        gps_invalid_time = 1 if self.flags & 0x10 else 0
+        err = 1 if self.flags & 0x01 else 0
+
+        if INFLUX_HK_TIMESTAMP == TimestampOptions.MainComputer:
+            timepoint_influx = math.trunc(self.trx * 1000)
+            write_precision_influx=WritePrecision.MS
+        else:
+            # print("inserintg data")
+
+            timepoint_influx = int(self.tstmp[0]*1e9+self.tstmp[1])
+            write_precision_influx=WritePrecision.NS
+    
         self._point = (
             Point(measurement_name)
             .field("state", self.state)
-            .field("PPS", pps)
-            .field("GPS", gps)
+            .field("PPS_NOK", pps)
+            .field("GPS_UART_NOK", gps_no_uart)
+            .field("GPS_OVERTIME", gps_overtime)
+            .field("GPS_TIME_NOK", gps_invalid_time)
             .field("ERR", err)
             .field("count", self.wform_count)
-            .time(time_ms, WritePrecision.MS)
+            .time(timepoint_influx, write_precision_influx)
         )
         
-        write_api.write(bucket=bucket, org=org, record=self._point)        
+        try:
+            write_api.write(bucket=bucket, org=org, record=self._point)        
+        except ApiException as e :
+            print(f"API Exception: {e.status} - {e.reason}", file=sys.stderr)
+        except ConnectionError as e :
+            print(f"Connection Error: {e}", file=sys.stderr)
+        except Exception as e :
+            print(f"An unexpected error occurred: {e}", file=sys.stderr)
 
 class RecvThread(Thread):
 
@@ -243,7 +300,7 @@ class RecvThread(Thread):
 
     def decode_hk(self, header, payload):
         #print('Decode HK')
-        hk = Hk(self.rpId)
+        hk = Hk(rpId = self.rpId)
         hk.read_data(payload)
         try:
             self.queue.put(hk, timeout=5)
@@ -272,19 +329,24 @@ class SaveThread(Thread):
         self.outdir = outdir
         self.dl2_dir = self.outdir.replace("DL0","DL2")
         self.wformno = wformno
-        self.event_list = []
+        self.event_list: List[Event] = []
         self.save_event = False
-        self.hk_list = []
+        self.hk_list: List[Hk] = []
         self.save_hk = True
-        self.wform_list = []
+        self.wform_list: List[Waveform] = []
         self.wform_count = 0
         self.running = True
         self._point = None
         self.spectrum_cfg = spectrum_cfg
         self.output_path = None
+        self.file_idx = 0
         if self.spectrum_cfg['Enable']:
-            self.output_path = Path(self.spectrum_cfg['ProcessOut'])
-            os.makedirs(self.output_path, exist_ok=True)
+            try:
+                expanded_process_out_value = os.path.expandvars(self.spectrum_cfg['ProcessOut'])
+                self.output_path = Path(expanded_process_out_value)
+                os.makedirs(self.output_path, exist_ok=True)
+            except TypeError as e:
+                print("WARNING: DL2 output log folder not provided.")
         # ------------------------------------------------------------------ #
         # Setup influx DB                                                    #
         # ------------------------------------------------------------------ #
@@ -358,19 +420,34 @@ class SaveThread(Thread):
                 # ------------------------------------------------------------------ #
 
                 if HAS_INFLUX_DB_COUNTS:
-                    time_ms = math.trunc((packet.tstart - 3600) * 1000)
-                    # time_ms = math.trunc(time.time() * 1000)
+                
+
+                    if INFLUX_WF_TIMESTAMP == TimestampOptions.RedPitaya: 
+                        time_ms = math.trunc((packet.tstart) * 1000) 
+                    else: 
+                        time_ms = math.trunc(time.time() * 1000) 
                     rpid = packet.rpID
                     if self._point is None:
                         self._point = Point("RPG%1d" % rpid).field("count", 1).time(time_ms, WritePrecision.MS)
                     else: 
                         self._point.time(time_ms, WritePrecision.MS)
-                    self.write_api.write(self.bucket, self.org, record=self._point)
+                    
+                    try:
+                        self.write_api.write(self.bucket, self.org, record=self._point)
+                    except ApiException as e :
+                        print(f"API Exception: {e.status} - {e.reason}", file=sys.stderr)
+                    except ConnectionError as e :
+                        print(f"Connection Error: {e}", file=sys.stderr)
+                    except Exception as e :
+                        print(f"An unexpected error occurred: {e}", file=sys.stderr)
+
+
+
 
                 self.wform_list.append(packet)
                 self.wform_count += 1
 
-                if self.wform_count == self.wformno:
+                if self.wform_count == self.wformno :
 
                     filename = self.dump_packets()
                                         
@@ -408,10 +485,10 @@ class SaveThread(Thread):
         
         cmd=[
             f"source activate {self.spectrum_cfg['Venv']}",
-            f"python {self.spectrum_cfg['ProcessName']} -d /home/usergamma --outdir {self.dl2_dir} {self.spectrum_cfg['ProcessArgs']} --filename {inputfile} > {output_log} 2>&1"
+            f"python {os.path.expandvars(self.spectrum_cfg['ProcessName'])} --outdir {self.dl2_dir} {self.spectrum_cfg['ProcessArgs']} --filename {inputfile} > {output_log} 2>&1"
         ]
         spectrum_cmd = " && ".join(cmd)
-        #print("DEBUG - process command: ", spectrum_cmd)
+        print("DEBUG - process command: ", spectrum_cmd)
 
         subprocess.Popen(spectrum_cmd, shell=True)
 
@@ -426,13 +503,12 @@ class SaveThread(Thread):
 
         # Create the file name using the rx time of the first waveform
         wf0 = self.wform_list[0]
-        ts = time.gmtime(wf0.trx)
-        str1 = time.strftime("%Y-%m-%dT%H_%M_%S", ts)
-        sns = math.modf(wf0.trx)
-        usec = round(sns[0] * 1e6)
+        current_time = time.time()
+        str1 = time.strftime("%Y-%m-%dT%H_%M_%S", time.gmtime(current_time))
+        usec = round((current_time - int(current_time)) * 1e6)
         str2 = '%06d' % usec
-        fname = '%s/wf_runId_%s_configId_%s_%s.%s' % (self.outdir, str(wf0.runID).zfill(5), str(wf0.configID).zfill(5), str1, str2)
-
+        fname = '%s/wf_runId_%s_file_%s_configId_%s_%s.%s' % (self.outdir, str(wf0.runID).zfill(5), str(self.file_idx).zfill(10), str(wf0.configID).zfill(5), str1, str2)
+        self.file_idx += 1
         print('Save file: ' + fname + '.h5')
 
         h5_out = tb.open_file(fname + '.h5', mode='w', title='dl0')
@@ -478,6 +554,8 @@ class SaveThread(Thread):
                 arr._v_attrs.state = hk.state
                 arr._v_attrs.flags = hk.flags
                 arr._v_attrs.wform_count = hk.wform_count
+                if hk.timestamp_found():
+                    arr._v_attrs.time = hk.compute_time()
                 arr[:] = 0
 
         h5_out.close()
@@ -559,6 +637,13 @@ if __name__ == '__main__':
                 INFLUX_DB_BUCKET_HK = cfg['INFLUXDB'].get("BucketHk")
             else:
                 HAS_INFLUX_DB_HK = False
+            try:
+                INFLUX_WF_TIMESTAMP = TimestampOptions(cfg['INFLUXDB'].get("Timestamp_Wf"))
+                print(f"Timestamp to load to influx set to: {INFLUX_WF_TIMESTAMP}")
+                INFLUX_HK_TIMESTAMP = TimestampOptions(cfg['INFLUXDB'].get("Timestamp_Hk"))
+                print(f"Timestamp to load to influx set to: {INFLUX_HK_TIMESTAMP}")
+            except ValueError as e:
+                print(f"WARNING: Cannot set 'TIMESTAMP' option: {e}. Using default value {TimestampOptions.MainComputer}")
         else:
             HAS_INFLUX_DB_HK = False
             HAS_INFLUX_DB_COUNTS = False
@@ -640,9 +725,3 @@ if __name__ == '__main__':
     save_thread.join()
 
     print('End')
-
-
-
-
-
-

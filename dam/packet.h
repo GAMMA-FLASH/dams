@@ -144,15 +144,16 @@ public:
     
     // Header data
     union {
-        uint8_t _p8[8];
-        uint16_t _p16[4];
-        uint32_t _p32[2];
+        uint8_t _p8[16];
+        uint16_t _p16[8];
+        uint32_t _p32[4];
         struct __attribute__((packed)) {
         	uint8_t type;
             uint8_t subType;
             uint8_t state;
             uint8_t flags;
             uint32_t waveCount;
+            struct timespec ts;
         };
     };
     

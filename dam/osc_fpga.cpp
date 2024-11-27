@@ -320,7 +320,7 @@ int osc_fpga_wait_trigger(useconds_t usec) {
 	for (int i = 0; i < 10000; i++) {
 		if (g_osc_fpga_reg_mem->conf & OSC_FPGA_CONF_DELAY_PASS) {
 			return 0;
-		} else }
+		} else {
 			usleep(usec);
 		}
 	}
