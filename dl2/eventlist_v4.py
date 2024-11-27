@@ -91,7 +91,7 @@ class EventlistGeneral:
         self.version = None
 
     def moving_average(self, x, w):
-        return np.convolve(x, np.ones(w), 'valid') / w
+        return np.convolve(x, np.ones(w), 'same') / w
     
     @staticmethod
     def twos_comp_to_int(val, bits=14):
@@ -142,63 +142,94 @@ class EventlistGeneral:
             print(f"La directory '{directory_path}' è stata creata.")
 
 class EventlistDL0(EventlistGeneral):
-    def process_file(self, filename, temperatures, outdir, log = False, startEvent=0, endEvent=-1, pbar_show=False):
+    def process_file(self, filename, temperatures, outdir, log=False, startEvent=0, endEvent=-1, pbar_show=False, 
+                     mavg_wsize=15, maxval=8192, bkgbaselev_size=100, findpk_width=15, findpk_distance=25, blocks_size=25):
+        """
+        Process a file containing waveform of type `DL0` data to compute various parameters and save results.
+        
+        Args:
+            filename (str): Input file DL0 path.
+            temperatures (list): Temperature data.
+            outdir (str): Output directory path.
+            log (bool): Flag to enable/disable detailed logging and plots.
+            startEvent (int): Index of the first event to process.
+            endEvent (int): Index of the last event to process (-1 means process all events).
+            pbar_show (bool): Whether to display a progress bar.
+        Optional Args:
+            mavg_wsize (int): Moving average size window, default 15.
+            maxval (int): Max value for counts, default 8192.
+            bkgbaselev_size (int): Number of first times to estimate background, default 100.
+            findpk_width (int): Required width of peaks in samples, default 15.
+            findpk_distance (int): Required minimal horizontal distance in samples between neighbouring peaks, default 25
+            blocks_size (int): Block size for computing the mean
+        """
         print("Processing " + filename)
+        # Ensure output directory exists
         self.create_directory(outdir)
+        # Construct the output file name
         basename = Path(outdir, os.path.basename(filename))
         outputfilename = f"{Path(basename).with_suffix('.dl2.h5')}"
-        # Check if file exists and is not empty
+        # Delete empty files if they exist
         self.delete_empty_file(outputfilename)
+        # Skip processing if output file already exists
         if os.path.exists(outputfilename):
             return
+        # Open the input HDF5 file for reading
         h5file = open_file(filename, mode="r")
         self.temperatures = temperatures
+        # Access the waveform group in the HDF5 file
         group = h5file.get_node("/waveforms")
         tstarts = []
         header = f"N_Waveform\tmult\ttstart\tindex_peak\tpeak\tintegral1\tintegral2\tintegral3\thalflife\ttemp"
+        # Create and write the header for the text output file
         f = open(f"{Path(basename).with_suffix('.dl2.txt')}", "w")
         f.write(f"{header}\n")
-        dl2_data = []
+        dl2_data = []   # List to store processed data for saving to output
         
-        shape_data = -1
-        lenwf = -1
+        shape_data = -1 # Variable to determine the waveform data structure
+        lenwf = -1      # Length of the waveform data
+        # Iterate over waveforms in the HDF5 group
         for i, data in tqdm(enumerate(group), disable=not pbar_show, 
                             total=endEvent+1 if endEvent > 0 else group._g_getnchildren()):
+            # Skip events before the startEvent index
             if i < int(startEvent):
                 continue
+            # Stop processing if the current index exceeds endEvent
             if endEvent > 0:
                 if i > int(endEvent):
                     break
-            # Get shape data
+            # Determine the data structure version (1.1 or 2.0)
             if shape_data < 0:
                 if data._v_attrs.VERSION == "1.1":
                     shape_data = 1
                 elif data._v_attrs.VERSION == "2.0":
                     shape_data = 0
+            # Get waveform length and start time
             lenwf = len(data[:,shape_data])
             # Get tstart
             tstart = data._v_attrs.tstart
-            # Get max value in wf
+            # Process waveform data to find peaks
             val = np.max(data[:,shape_data])
-            if val > 8192:
+            if val > maxval:
+                # Convert two's complement to integers
                 y = np.array(data[:,shape_data].shape)     
                 for i, val in enumerate(data[:,shape_data]):
                     y[i] = Eventlist.twos_comp_to_int(val)
             else:
                 y = data[:,shape_data]
-            # Deep copy of y array 
+            # Create a copy of the waveform array for processing
             arr = y.copy()
-            # Compute moving average
-            arrmov = self.moving_average(arr, 15)
-            # Extract peaks
-            arr3 = arr[:100].copy()
+            # Compute the moving average of the waveform
+            arrmov = self.moving_average(arr, mavg_wsize)
+            # Extract peaks based on moving average and thresholds
+            arr3 = arr[:bkgbaselev_size].copy()
             mmean1 = arr3.mean()
             stdev1 = arr3.std()
             mmean2 = mmean1 * 2 * 0.9 
-            peaks, _ = find_peaks(arrmov, height=mmean2, width=15, distance=25)
+            peaks, _ = find_peaks(arrmov, height=mmean2, width=findpk_width, distance=findpk_distance)
+            # Filter peaks based on predefined conditions
             deltav = 20
             peaks2 = np.copy(peaks)
-            # Filtering peaks
             for v in peaks2:
                 arrcalcMM = arrmov[v] - arrmov[v-deltav:v+deltav].copy()
                 # 80 has been chosen with heuristics on data 
@@ -206,6 +237,7 @@ class EventlistDL0(EventlistGeneral):
                 # Remove peaks too small or peaks too close to the end of the wf
                 if len(ind[0]) == 0 or v > 16000:
                     if log == True:
+                        # Optionally log detailed information and plots
                         print("delete peak")
                         print(peaks)
                         plt.figure()
@@ -215,10 +247,11 @@ class EventlistDL0(EventlistGeneral):
                             plt.axvline(x = v, color = 'r') 
                         plt.show()
                     peaks = peaks[peaks != v]
+            # Log detailed information about peaks (optional)
             if log == True:
                 print(f"Waveform num. {i} ##############################")
                 print(f"la waveform num. {i} ha i seguenti peaks: {peaks} e mean value {mmean1} and stdev {stdev1}")
-
+            # Handle cases with no peaks
             if len(peaks) == 0:
                 current_tstart = tstart
                 temp = self.get_temperature(tstart)
@@ -231,6 +264,7 @@ class EventlistDL0(EventlistGeneral):
                     plt.plot(range(len(arrmov)),arrmov)
                     plt.show()
             else:
+                # Handle cases with peaks
                 j=0
                 for v in peaks:
                     integral = 0
@@ -240,7 +274,6 @@ class EventlistDL0(EventlistGeneral):
                     try:
                         # Calculation on raw data
                         arrcalc = arr[v-deltav:].copy()
-                        blocks_size = 25
                         arrcalc_blocks = np.lib.stride_tricks.sliding_window_view(arrcalc, blocks_size)
                         meanblock  = arrcalc_blocks.mean(axis=1)
                         rowsL = np.where(np.logical_and(meanblock > mmean1 - stdev1, 
@@ -259,8 +292,10 @@ class EventlistDL0(EventlistGeneral):
                         meanblockMM  = arrcalcMM_blocks.mean(axis=1)
                         rowsLMM = np.where(np.logical_and(meanblockMM > mmean1 - stdev1, 
                                                           meanblockMM < mmean1 + stdev1))[0]
+                        # indexRowsMM=np.where(rowsLMM >= deltav)[0]
                         if len(rowsLMM) > 0:
                             arrSignalMM = arrcalcMM[:rowsLMM[0]].copy()
+                            # arrSignalMM = arrcalcMM[:rowsLMM[indexRowsMM[0]]].copy()
                         else:
                             arrSignalMM = arrcalcMM.copy()
                         arrSubMM = np.subtract(arrSignalMM, mmean1)
@@ -349,7 +384,27 @@ class EventlistDL1(EventlistGeneral):
             # NOTE: in DL0 wf with more than a PK get a +1
             return peak_idx + j + 1
 
-    def process_file(self, filename, temperatures, outdir, log = False, startEvent=0, endEvent=-1, pbar_show=False):
+    def process_file(self, filename, temperatures, outdir, log = False, startEvent=0, endEvent=-1, pbar_show=False, 
+                     mavg_wsize=15, maxval=8192, bkgbaselev_size=100, findpk_width=15, findpk_distance=25, blocks_size=25):
+        """
+        Process a file containing waveform of type `DL0` data to compute various parameters and save results.
+        
+        Args:
+            filename (str): Input file DL0 path.
+            temperatures (list): Temperature data.
+            outdir (str): Output directory path.
+            log (bool): Flag to enable/disable detailed logging and plots.
+            startEvent (int): Index of the first event to process.
+            endEvent (int): Index of the last event to process (-1 means process all events).
+            pbar_show (bool): Whether to display a progress bar.
+        Optional Args:
+            mavg_wsize (int): Moving average size window, default 15.
+            maxval (int): Max value for counts, default 8192.
+            bkgbaselev_size (int): Number of first times to estimate background, default 100.
+            findpk_width (int): Required width of peaks in samples, default 15.
+            findpk_distance (int): Required minimal horizontal distance in samples between neighbouring peaks, default 25
+            blocks_size (int): Block size for computing the mean
+        """
         print("Processing " + filename)
         self.create_directory(outdir)
         basename = Path(outdir, os.path.basename(filename))
@@ -390,19 +445,19 @@ class EventlistDL1(EventlistGeneral):
             # Get maximum value of wf
             val = np.max(data)
             y = data
-            if val > 8192:
+            if val > maxval:
                 for t, val in enumerate(data):
                     y[t] = Eventlist.twos_comp_to_int(val)
             # Deep copy of y array 
             arr = y.copy()
             # Compute moving average
-            arrmov = self.moving_average(arr, 15)
+            arrmov = self.moving_average(arr, mavg_wsize)
             if self.dl1attrs.get_attr(h5file, i, 'n_peaks') == 0:
                 # If in DL1 we didn't find any peak the list should be empty
                 peaks = []
             elif isdoubleEvent:
                 # If it is a double event
-                peaks, _ = find_peaks(arrmov, height=mmean1*2* 0.9, width=15, distance=25)
+                peaks, _ = find_peaks(arrmov, height=mmean1*2* 0.9, width=findpk_width, distance=findpk_distance)
             else:
                 # If it is a single event event 
                 peaks  = [self.dl1attrs.get_attr(h5file, i, 'peak_pos') - wf_start]
@@ -449,7 +504,6 @@ class EventlistDL1(EventlistGeneral):
                     try:
                         # Calculation on raw data
                         arrcalc = arr[v-deltav:].copy()
-                        blocks_size = 25
                         arrcalc_blocks = np.lib.stride_tricks.sliding_window_view(arrcalc, blocks_size)
                         meanblock  = arrcalc_blocks.mean(axis=1)
                         rowsL = np.where(np.logical_and(meanblock > mmean1 - stdev1, 
@@ -570,8 +624,30 @@ class Eventlist:
     def create_directory(self, directory_path):
         self.evntlist.create_directory(directory_path)
 
-    def process_file(self, filename, temperatures, outdir, log=False, startEvent=0, endEvent=-1, pbar_show=False):
-        self.evntlist.process_file(filename, temperatures, outdir, log=log, startEvent=startEvent, endEvent=endEvent, pbar_show=pbar_show)
+    def process_file(self, filename, temperatures, outdir, log=False, startEvent=0, endEvent=-1, pbar_show=False, 
+                     mavg_wsize=15, maxval=8192, bkgbaselev_size=100, findpk_width=15, findpk_distance=25, blocks_size=25):
+        """
+        Process a file containing waveform of type `DL0` data to compute various parameters and save results.
+        
+        Args:
+            filename (str): Input file DL0 path.
+            temperatures (list): Temperature data.
+            outdir (str): Output directory path.
+            log (bool): Flag to enable/disable detailed logging and plots.
+            startEvent (int): Index of the first event to process.
+            endEvent (int): Index of the last event to process (-1 means process all events).
+            pbar_show (bool): Whether to display a progress bar.
+        Optional Args:
+            mavg_wsize (int): Moving average size window, default 15.
+            maxval (int): Max value for counts, default 8192.
+            bkgbaselev_size (int): Number of first times to estimate background, default 100.
+            findpk_width (int): Required width of peaks in samples, default 15.
+            findpk_distance (int): Required minimal horizontal distance in samples between neighbouring peaks, default 25
+            blocks_size (int): Block size for computing the mean
+        """
+        self.evntlist.process_file(filename, temperatures, outdir, log=log, startEvent=startEvent, endEvent=endEvent, pbar_show=pbar_show,
+                                   mavg_wsize=mavg_wsize, maxval=maxval, bkgbaselev_size=bkgbaselev_size, findpk_width=findpk_width, 
+                                   findpk_distance=findpk_distance, blocks_size=blocks_size)
 
 
 if __name__ == '__main__':
