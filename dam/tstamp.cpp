@@ -315,7 +315,10 @@ uint32_t TimeStamp::read(CurrentTime *currTime) {
 void TimeStamp::computeAbsoluteTime(const struct timespec *ts, CurrentTime *currTime, AbsoluteTime *absTime) {
 
 	struct timespec delta_ts;
-	delta_time(ts, &currTime->ts, &delta_ts);
+	struct timespec tempTs; // Temporary variable for proper alignment
+        tempTs = currTime->ts;  // Copy the packed member into the temporary variable
+        delta_time(ts, &tempTs, &delta_ts); // Pass the temporary variable
+	
 	
 	absTime->ppsSliceNo = (uint16_t)delta_ts.tv_sec;
 	absTime->hh = currTime->hh;

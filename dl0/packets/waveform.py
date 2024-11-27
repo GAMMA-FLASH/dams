@@ -137,7 +137,9 @@ class Waveform:
 
     def unpack_data(self,f):
         self.data = struct.unpack("<%dH" % self.sample_no, f.read(2*self.sample_no))
-        self.compute_sig()
+        self.compute_sigr()
+        self.compute_sige()
+        self.compute_sigt()
 
     def pack_data(self, f):
         raw = struct.pack("<%dH" % self.sample_no, *self.data)
@@ -237,7 +239,7 @@ class Waveform:
 
         self.sample_to_read -= n
         if self.sample_to_read == 0:
-            self.compute_sig() # This is not needed to produce DL0
+            self.compute_sigr() # This is not needed to produce DL0
             return True
         else:
             return False
@@ -253,7 +255,7 @@ class Waveform:
         self.tstart = float(self.tstmp[0]) + float(self.tstmp[1]) * 1e-9
         self.tstop = self.tstart + self.dt * (self.sample_no - 1)
 
-    def compute_sig(self):
+    def compute_sigr(self):
 
         # Reordering
         curr_off = self.curr_off + 1
@@ -266,14 +268,16 @@ class Waveform:
 
         self.trigt = len(pre_trig) * self.dt
 
-        self.sigt = np.zeros(self.sample_no)
         self.sigr = np.zeros(self.sample_no)
         count = 0
         for raw in pre_trig + post_trig:
-            self.sigt[count] = count * self.dt
             self.sigr[count] = twos_comp_to_int(raw, 14)
             count += 1
 
+    def compute_sigt(self):
+        self.sigt = np.linspace(self.tstart, self.tstop, self.sample_no)
+
+    def compute_sige(self):
         if self.eql == 1:
             self.sige = self.sigr * 2.0 / 16384
         else:
@@ -333,6 +337,7 @@ if __name__ == "__main__":
     rcParams['font.family'] = 'arial'
 
     fig, ax = plt.subplots(figsize=(12, 4))
+
     ax.plot(wform.sigt, wform.sige)
     ax.axvline(x=wform.trigt, color="black", linestyle=(0, (5, 5)))
     ax.set_xlabel("Time [s]")

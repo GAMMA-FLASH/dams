@@ -23,6 +23,16 @@
 
 using namespace std;
 
+// Function to crop the path
+void cropPath(char* croppedPath, const char* path) {
+    // Calculate the maximum length for the path
+    size_t maxPathLength = DS_MAX_NAME_LEN - (15);
+
+    // Copy the path into the croppedPath, ensuring it doesn't exceed maxPathLength
+    strncpy(croppedPath, path, maxPathLength);
+    croppedPath[maxPathLength] = '\0'; // Ensure null-termination
+}
+
 DataStore::DataStore() {
     
     memset(path, 0, DS_MAX_NAME_LEN);
@@ -81,7 +91,12 @@ int DataStore::openFile() {
 		// Create file name
 		char fname[DS_MAX_NAME_LEN];
 		
-		sprintf(fname, "%s/%06d_", path, g_systemInfo.fileCount);
+		 // Crop the path to the maximum allowable length
+    		char croppedPath[DS_MAX_NAME_LEN-15];
+		cropPath(croppedPath, path);
+
+    // Format the string safely with the cropped path
+    snprintf(fname, sizeof(fname), "%s/%06d_", croppedPath, g_systemInfo.fileCount);
 		
 		// fpath time field
     	time_t ltime;
