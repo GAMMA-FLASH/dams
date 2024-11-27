@@ -29,9 +29,7 @@ class WorkerDL0toDL2(WorkerBase):
 				filename = os.path.basename(source.replace('.h5', '.dl2.h5'))
 				dl2_filename = os.path.join(dest, filename)
 				# Add message in queue
-				# self.manager.result_lp_queue.put(dl2_filename)
-				self.logger.info(f"Adding \'{dl2_filename}\' in result queue", extra=self.globalname)
 				return dl2_filename
 			except Exception as e:
-				self.logger.critical("Exception raised:\n{traceback.format_exc()}", extra=self.globalname)
+				self.logger.critical(f"Exception raised:\n{traceback.format_exc()}", extra=self.globalname)
 				return None

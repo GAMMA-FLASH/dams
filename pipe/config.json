@@ -1,9 +1,15 @@
 [
-  {
-	"processname": "CommandCenter",
-	"command_socket": "tcp://127.0.0.1:5551",
-	"monitoring_socket": "tcp://127.0.0.1:5552"
-  },
+	{
+        "processname": "Monitoring",
+        "monitoring_forwarder":"off",
+        "forwarder_frontend_socket": "none",
+        "forwarder_backend_socket": "none",
+        "monitoring_socket": "tcp://127.0.0.1:5552"
+    },
+	{
+        "processname": "CommandCenter",
+        "command_socket": "tcp://127.0.0.1:5551"      
+    },
   {
 	"processname": "DL0toDL2",
 	"dataflow_type": "string",
@@ -13,14 +19,20 @@
 	"data_hp_socket": "tcp://127.0.0.1:5556",
 	"command_socket": "tcp://127.0.0.1:5551",
 	"monitoring_socket": "tcp://127.0.0.1:5552",
-	"manager_result_socket_type": ["pushpull"],
-	"manager_result_dataflow_type": ["string"],
-	"manager_result_lp_socket": ["tcp://127.0.0.1:5559"],
-	"manager_result_hp_socket": ["tcp://127.0.0.1:5560"],
-	"manager_num_workers": [1],
-	"logs_path": "/home/usergamma/workspace/dams/pipe/logs",
-	"logs_level": 5,
-	"comment": "datasockettype=pushpull|pubsub dataflowtype=binary|filename|string processingtype=process|thread"
+	"manager": [
+        {
+            "result_socket_type": "pushpull",
+            "result_dataflow_type": "string",
+            "result_lp_socket": "tcp://127.0.0.1:5559",
+            "result_hp_socket": "tcp://127.0.0.1:5560",
+            "num_workers": 5,
+            "name": "Rate",
+            "name_workers": "worker"
+        }
+    ],
+	"logs_path": "/home/usergamma/workspace/Data/logs",
+    "logs_level": 3,
+    "comment": "datasockettype=pushpull|pubsub|custum dataflowtype=binary|filename|string processingtype=process|thread"
   },
   {
 	"processname": "DL0toDL1",
@@ -31,14 +43,20 @@
 	"data_hp_socket": "tcp://127.0.0.1:5556",
 	"command_socket": "tcp://127.0.0.1:5551",
 	"monitoring_socket": "tcp://127.0.0.1:5552",
-	"manager_result_socket_type": ["pubsub"],
-	"manager_result_dataflow_type": ["string"],
-	"manager_result_lp_socket": ["tcp://127.0.0.1:5553"],
-	"manager_result_hp_socket": ["tcp://127.0.0.1:5554"],
-	"manager_num_workers": [1],
-	"logs_path": "/home/usergamma/workspace/dams/pipe/logs",
-	"logs_level": 5,
-	"comment": "datasockettype=pushpull|pubsub dataflowtype=binary|filename|string processingtype=process|thread"
+	"manager": [
+        {
+            "result_socket_type": "pubsub",
+            "result_dataflow_type": "string",
+            "result_lp_socket": "tcp://127.0.0.1:5553",
+            "result_hp_socket": "tcp://127.0.0.1:5554",
+            "num_workers": 5,
+            "name": "Rate",
+            "name_workers": "worker"
+        }
+    ],
+	"logs_path": "/home/usergamma/workspace/Data/logs",
+	"logs_level": 3,
+    "comment": "datasockettype=pushpull|pubsub|custum dataflowtype=binary|filename|string processingtype=process|thread"
   },
   {
 	"processname": "DL1toDL2",
@@ -49,14 +67,20 @@
 	"data_hp_socket": "tcp://127.0.0.1:5554",
 	"command_socket": "tcp://127.0.0.1:5551",
 	"monitoring_socket": "tcp://127.0.0.1:5552",
-	"manager_result_socket_type": ["pushpull"],
-	"manager_result_dataflow_type": ["string"],
-	"manager_result_lp_socket": ["tcp://127.0.0.1:5559"],
-	"manager_result_hp_socket": ["tcp://127.0.0.1:5560"],
-	"manager_num_workers": [1],
-	"logs_path": "/home/usergamma/workspace/dams/pipe/logs",
-	"logs_level": 5,
-	"comment": "datasockettype=pushpull|pubsub dataflowtype=binary|filename|string processingtype=process|thread"
+	"manager": [
+        {
+            "result_socket_type": "pushpull",
+            "result_dataflow_type": "string",
+            "result_lp_socket": "tcp://127.0.0.1:5559",
+            "result_hp_socket": "tcp://127.0.0.1:5560",
+            "num_workers": 5,
+            "name": "Rate",
+            "name_workers": "worker"
+        }
+    ],
+	"logs_path": "/home/usergamma/workspace/Data/logs",
+	"logs_level": 3,
+    "comment": "datasockettype=pushpull|pubsub|custum dataflowtype=binary|filename|string processingtype=process|thread"
   },
   {
 	"processname": "DL2Checker",
@@ -67,13 +91,19 @@
 	"data_hp_socket": "tcp://127.0.0.1:5560",
 	"command_socket": "tcp://127.0.0.1:5551",
 	"monitoring_socket": "tcp://127.0.0.1:5552",
-	"manager_result_socket_type": ["none"],
-	"manager_result_dataflow_type": ["none"],
-	"manager_result_lp_socket": ["none"],
-	"manager_result_hp_socket": ["none"],
-	"manager_num_workers": [1],
-	"logs_path": "/home/usergamma/workspace/dams/pipe/logs",
-	"logs_level": 5,
-	"comment": "datasockettype=pushpull|pubsub dataflowtype=binary|filename|string processingtype=process|thread"
+	"manager": [
+        {
+            "result_socket_type": "none",
+            "result_dataflow_type": "none",
+            "result_lp_socket": "none",
+            "result_hp_socket": "none",
+            "num_workers": 5,
+            "name": "Rate",
+            "name_workers": "worker"
+        }
+    ],
+	"logs_path": "/home/usergamma/workspace/Data/logs",
+	"logs_level": 3,
+	"comment": "datasockettype=pushpull|pubsub dataflowtype=binary|filename|string processingtype=process|thread logs_level=1|2|3"
   }
 ]

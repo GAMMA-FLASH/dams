@@ -27,7 +27,6 @@ class WorkerDL1toDL2(WorkerBase):
 				source = data["source"]
 				dest = data["dest"]
 				# Process DL1 to DL2
-				self.logger.info(f"Starting processing \'{source}\'", extra=self.globalname)
 				self.eventlist.process_file(source, None, dest)
 				self.logger.info(f"Processing complete \'{source}\'", extra=self.globalname)
 				# Get filename
@@ -35,8 +34,6 @@ class WorkerDL1toDL2(WorkerBase):
 				dl2_filename = os.path.join(dest, filename)
 				self.logger.debug(f"dl2_filename=\'{dl2_filename}\'", extra=self.globalname)
 				# Add message in queue
-				# self.manager.result_lp_queue.put(dl2_filename)
-				self.logger.info(f"Adding \'{dl2_filename}\' in result queue", extra=self.globalname)
 				return dl2_filename
 			except Exception as e:
 				self.logger.critical(f"Exception raised:\n{traceback.format_exc()}", extra=self.globalname)

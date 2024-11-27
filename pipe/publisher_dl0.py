@@ -8,18 +8,15 @@ from printcolors import colore_verde, reset_colore, colore_giallo
 
 
 
-def publish(path_dl0: str, 
-            path_dl1: str, 
-            path_dl2: str, 
-            F_sleep: bool, 
-            socket: zmq.Socket,
-            time_sleep_inframessage: int):
+def publish(path_dl0: str, path_dl1: str, path_dl2: str, 
+            F_sleep: bool,  socket: zmq.Socket, time_sleep_inframessage: int,
+            prev_dl0: str = None):
     if not os.path.exists(path_dl0):
         print(f"WARNING! path_dl0 \"{path_dl0}\" does not exists!")
         return
     # BASE CASE: path_dl0 is a file
     if not os.path.isdir(path_dl0):
-        if not ('.ok' == os.path.splitext(path_dl0)[-1]):
+        if (not '.ok' == os.path.splitext(path_dl0)[-1]) and ('.h5' in os.path.basename(path_dl0)):
             # Sleep only first time for 
             if F_sleep: time.sleep(1)
             # Data message creation
@@ -36,9 +33,14 @@ def publish(path_dl0: str,
             # Send message
             socket.send_string(message)
             # Update the user
+            if (not prev_dl0 is None) and (os.path.dirname(path_dl0) != os.path.dirname(prev_dl0)):
+                print(path_dl0, prev_dl0)
+                print(f"Completed publishing {os.path.dirname(prev_dl0)}")
             print(f"Sent: {colore_verde}{message}{reset_colore}")
-        else:
-            print(f"skip: {colore_giallo}{path_dl0}{reset_colore}")
+            return path_dl0
+        # else:
+        #     print(f"skip: {colore_giallo}{path_dl0}{reset_colore}")
+        return None
     # INDUCTIVE CASE: path_dl0 is a directory
     else:
         # Create the directory
@@ -46,6 +48,7 @@ def publish(path_dl0: str,
         os.makedirs(path_dl2, exist_ok=True)
         # List children for path_dl0
         children = os.listdir(path_dl0)
+        children.sort()
         for child in children:
             # Combine new path
             new__path_dl0 = os.path.join(path_dl0, child)
@@ -53,9 +56,10 @@ def publish(path_dl0: str,
             new__path_dl2 = os.path.join(path_dl2, child)
             # Publish each new child
             time.sleep(time_sleep_inframessage)
-            publish(new__path_dl0, new__path_dl1, new__path_dl2, F_sleep, socket, time_sleep_inframessage)
+            prev_dl0 = publish(new__path_dl0, new__path_dl1, new__path_dl2, F_sleep, socket, time_sleep_inframessage, prev_dl0)
             # Change sleep status
             F_sleep = F_sleep and False
+        return None
 
 
 
@@ -69,13 +73,16 @@ if __name__ == "__main__":
     path_dl0, path_dl1, path_dl2 = sys.argv[1], sys.argv[2], sys.argv[3] 
     # Get the socket name where publishing the file name to process from DL0 to DL2
     socketstring = sys.argv[4]
-    for i in range(3):
-        print(f"{3-i}")
+    countdown=10
+    for i in range(countdown):
+        print(f"{countdown-i}")
         time.sleep(1)
-    time_sleep_inframessage = int(sys.argv[5])
+    time_sleep_inframessage = float(sys.argv[5])
     # Bind socket
     context = zmq.Context()
     socket = context.socket(zmq.PUB)
     socket.bind(socketstring)
     # Publish DL0 files recursive mode
     publish(path_dl0, path_dl1, path_dl2, True, socket, time_sleep_inframessage)
+    
+    print(f"DL0_to_DL2 Pipe publishing Completed!")

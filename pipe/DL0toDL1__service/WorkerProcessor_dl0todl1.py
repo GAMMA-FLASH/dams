@@ -25,10 +25,10 @@ class WorkerDL0toDL1(WorkerBase):
 			dest1 = data["path_dl1_folder"]
 			dest2 = data["path_dl2_folder"]
 			# Process DL0 to DL1
-			self.logger.info(f"Starting processing \'{dest1}\'", extra=self.globalname)
+			# self.logger.info(f"Starting processing \'{dest1}\'", extra=self.globalname)
 			try:
 				self.snapeventlist.process_file(source, dest1)
-				self.logger.info(f"Processing complete \'{dest1}\'", extra=self.globalname)
+				self.logger.info(f"Processing complete \'{source}\'", extra=self.globalname)
 				# Get filename
 				filename = os.path.basename(source.replace('.h5', '.dl1.h5'))
 				# Prepare data result
