@@ -1,2 +1,10 @@
 *.pyc
+.vscode
+dl1/output_dl1
+dl1/output_dl2
+gf_venv
+pipe/test
+*.h5
+nohup.out
+*.txt
 *.log

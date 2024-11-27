@@ -1,0 +1,109 @@
+[
+	{
+        "processname": "Monitoring",
+        "monitoring_forwarder":"off",
+        "forwarder_frontend_socket": "none",
+        "forwarder_backend_socket": "none",
+        "monitoring_socket": "tcp://127.0.0.1:5552"
+    },
+	{
+        "processname": "CommandCenter",
+        "command_socket": "tcp://127.0.0.1:5551"      
+    },
+  {
+	"processname": "DL0toDL2",
+	"dataflow_type": "string",
+	"processing_type": "process",
+	"datasocket_type": "pubsub",
+	"data_lp_socket": "tcp://127.0.0.1:5555",
+	"data_hp_socket": "tcp://127.0.0.1:5556",
+	"command_socket": "tcp://127.0.0.1:5551",
+	"monitoring_socket": "tcp://127.0.0.1:5552",
+	"manager": [
+        {
+            "result_socket_type": "pushpull",
+            "result_dataflow_type": "string",
+            "result_lp_socket": "tcp://127.0.0.1:5559",
+            "result_hp_socket": "tcp://127.0.0.1:5560",
+            "num_workers": 5,
+            "name": "dl0todl2",
+            "name_workers": "worker"
+        }
+    ],
+	"logs_path": "/home/usergamma/workspace/Data/logs",
+    "logs_level": 3,
+    "comment": "datasockettype=pushpull|pubsub|custum dataflowtype=binary|filename|string processingtype=process|thread"
+  },
+  {
+	"processname": "DL0toDL1",
+	"dataflow_type": "string",
+	"processing_type": "process",
+	"datasocket_type": "pubsub",
+	"data_lp_socket": "tcp://127.0.0.1:5555",
+	"data_hp_socket": "tcp://127.0.0.1:5556",
+	"command_socket": "tcp://127.0.0.1:5551",
+	"monitoring_socket": "tcp://127.0.0.1:5552",
+	"manager": [
+        {
+            "result_socket_type": "pubsub",
+            "result_dataflow_type": "string",
+            "result_lp_socket": "tcp://127.0.0.1:5553",
+            "result_hp_socket": "tcp://127.0.0.1:5554",
+            "num_workers": 5,
+            "name": "dl0todl1",
+            "name_workers": "worker"
+        }
+    ],
+	"logs_path": "/home/usergamma/workspace/Data/logs",
+	"logs_level": 3,
+    "comment": "datasockettype=pushpull|pubsub|custum dataflowtype=binary|filename|string processingtype=process|thread"
+  },
+  {
+	"processname": "DL1toDL2",
+	"dataflow_type": "string",
+	"processing_type": "process",
+	"datasocket_type": "pubsub",
+	"data_lp_socket": "tcp://127.0.0.1:5553",
+	"data_hp_socket": "tcp://127.0.0.1:5554",
+	"command_socket": "tcp://127.0.0.1:5551",
+	"monitoring_socket": "tcp://127.0.0.1:5552",
+	"manager": [
+        {
+            "result_socket_type": "pushpull",
+            "result_dataflow_type": "string",
+            "result_lp_socket": "tcp://127.0.0.1:5559",
+            "result_hp_socket": "tcp://127.0.0.1:5560",
+            "num_workers": 5,
+            "name": "dl1todl2",
+            "name_workers": "worker"
+        }
+    ],
+	"logs_path": "/home/usergamma/workspace/Data/logs",
+	"logs_level": 3,
+    "comment": "datasockettype=pushpull|pubsub|custum dataflowtype=binary|filename|string processingtype=process|thread"
+  },
+  {
+	"processname": "DL2Checker",
+	"dataflow_type": "string",
+	"processing_type": "process",
+	"datasocket_type": "pushpull",
+	"data_lp_socket": "tcp://127.0.0.1:5559",
+	"data_hp_socket": "tcp://127.0.0.1:5560",
+	"command_socket": "tcp://127.0.0.1:5551",
+	"monitoring_socket": "tcp://127.0.0.1:5552",
+	"manager": [
+        {
+            "result_socket_type": "none",
+            "result_dataflow_type": "none",
+            "result_lp_socket": "none",
+            "result_hp_socket": "none",
+            "num_workers": 5,
+            "name": "dl2chkr",
+            "name_workers": "worker"
+        }
+    ],
+	"logs_path": "/home/usergamma/workspace/Data/logs",
+	"logs_level": 3,
+	"comment": "datasockettype=pushpull|pubsub dataflowtype=binary|filename|string processingtype=process|thread logs_level=1|2|3"
+  }
+]
