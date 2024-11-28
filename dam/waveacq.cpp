@@ -19,6 +19,8 @@
 #include "globals.h"
 
 #include "fifo.h"
+#include "rp.h"
+#include "oscilloscope.h"
 #include "osc_fpga.h"
 
 #include "waveacq.h"
@@ -118,14 +120,12 @@ void *acqThreadFcn(void *ptr) {
     TRACE("WaveAcq::acqThreadFcn: started\n");
     
     sleep(1);
-    
-    int res = osc_fpga_init();
-    if (res < 0) {
-		fprintf(stderr, "Error: osc_fpga_init() failed: terminate\n");
-		return EXIT_SUCCESS;
-	}
-    
+    int res=0;
+    if(rp_Init() != RP_OK){
+                fprintf(stderr, "Rp api init failed!\n");
+    }
     sleep(1);
+	usleep(199);
     
     // Make sure to have enought time to fill the buffer before the trigger
 	int armDelayUsec = (OSC_FPGA_SIG_LEN - g_configInfo.oscTrigDelay)*8/(g_configInfo.oscDecimation*1000);
@@ -145,31 +145,48 @@ void *acqThreadFcn(void *ptr) {
 	printf("       Arm delay: %6d\n", armDelayUsec);	
     
     // 1. Reset
-	osc_fpga_reset();
+	rp_AcqReset();
 	
 	// 2. Set filters
-	osc_fpga_cha_set_filter(g_configInfo.oscEqLevel, 1);
+	rp_pinState_t pin = RP_LOW ;
+	if (g_configInfo.oscEqLevel == 2){
+		pin = RP_HIGH;
+	}
+	rp_AcqSetGain(RP_CH_1, pin);
+
+	// osc_fpga_cha_set_filter(g_configInfo.oscEqLevel, 1);
 	
 	// 3. Set decimation
-	osc_fpga_set_decimation(g_configInfo.oscDecimation);
-	osc_fpga_set_averaging(0);
+	
+	osc_SetDecimation(g_configInfo.oscDecimation);
+	// osc_fpga_set_decimation(g_configInfo.oscDecimation);
+	rp_AcqSetAveraging(false);
+	osc_SetThresholdChA(g_configInfo.oscTrigThresh);
+	osc_SetHysteresisChA(g_configInfo.oscTrigHyst);
+	osc_SetTriggerDelay(g_configInfo.oscTrigDelay);
+	
+	// osc_fpga_set_averaging(0);
 	
 	// 4. Set trigger parameters
-	osc_fpga_cha_set_trigger_par(g_configInfo.oscTrigThresh, g_configInfo.oscTrigHyst);
-	osc_fpga_set_trigger_delay(g_configInfo.oscTrigDelay);
-	osc_fpga_set_trigger_debounce(g_configInfo.oscTrigDebounce);
-	
+	// osc_fpga_cha_set_trigger_par(g_configInfo.oscTrigThresh, g_configInfo.oscTrigHyst);
+	// osc_fpga_set_trigger_delay(g_configInfo.oscTrigDelay);
+	// osc_fpga_set_trigger_debounce(g_configInfo.oscTrigDebounce);
+	osc_SetUnlockTrigger();
+	osc_SetTriggerSource((rp_acq_trig_src_t) g_configInfo.oscTrigSource);
     // INFINITE LOOP
     for(;;) {
     	
     	// 5. Start writing into the FPGA memory
-    	osc_fpga_arm_trigger();
+		osc_WriteDataIntoMemory(true);
+    	// osc_fpga_arm_trigger();
     	
     	// 6. Wait to fill the pre-trigger part of the wform
     	usleep(armDelayUsec);
     	
     	// 7. Enable the trigger
-    	osc_fpga_set_trigger_source(g_configInfo.oscTrigSource);
+		// rp_AcqSetTriggerSrc(RP_TRIG_SRC_CHA_PE);
+		
+    	// osc_fpga_set_trigger_source();
 		
 		// 8. Wait for an event
 		// Sometime the trigger gets stucked so the wait is repeated a fixed number of times
@@ -195,12 +212,20 @@ void *acqThreadFcn(void *ptr) {
 			wformBuff->acqInfo.tsts 		= (uint8_t)tsts;
 			wformBuff->acqInfo.eql 			= g_configInfo.oscEqLevel;
 			wformBuff->acqInfo.dec 			= g_configInfo.oscDecimation;
-			wformBuff->acqInfo.currOff 		= g_osc_fpga_reg_mem->wr_ptr_curr;
-			wformBuff->acqInfo.trigOff 		= g_osc_fpga_reg_mem->wr_ptr_trig;
+			bool fillState = false;
+			while(!fillState){
+				rp_AcqGetBufferFillState(&fillState);
+			}
+			uint32_t wr_ptr_trig = 0;
+			uint32_t wr_ptr_curr = 0;
+			osc_GetWritePointer(&wr_ptr_curr);
+			osc_GetWritePointerAtTrig(&wr_ptr_trig);
+			wformBuff->acqInfo.currOff 		= wr_ptr_curr;
+			wformBuff->acqInfo.trigOff 		= wr_ptr_trig;
 			wformBuff->acqInfo.size 		= OSC_FPGA_SIG_LEN;
 			
 			// Copy data
-			memcpy_32_min(wformBuff->data, g_osc_fpga_cha_mem, OSC_FPGA_SIG_LEN);
+			memcpy_32_min(wformBuff->data, osc_GetDataBufferChA(), OSC_FPGA_SIG_LEN);
 			
 			// Release buffer
 			m_fifo.pushRelease();
