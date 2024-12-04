@@ -9,8 +9,8 @@ class WorkerDL0toDL1(WorkerBase):
 		super().__init__()
 		# Create for eventlist
 		self.snapeventlist = EventlistSnapshot(
-			'/home/usergamma/workspace/dams/dl1/dl02dl1_config.json', # Config file
-			'/home/usergamma/workspace/dams/dl1/DL1model.xml'		  # XML model
+			'/home/gamma/workspace/dams/dl1/dl02dl1_config.json', # Config file
+			'/home/gamma/workspace/dams/dl1/DL1model.xml'		  # XML model
 		)
 
 	def process_data(self, data, priority):
