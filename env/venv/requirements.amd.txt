@@ -8,3 +8,6 @@ joblib
 pandas
 seaborn
 PyQt5
+psutil
+zmq
+astropy

@@ -7,3 +7,6 @@ matplotlib
 joblib
 pandas
 seaborn
+psutil
+zmq
+astropy

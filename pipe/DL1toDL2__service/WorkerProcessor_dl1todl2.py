@@ -11,7 +11,7 @@ class WorkerDL1toDL2(WorkerBase):
 		# Create for eventlist
 		self.eventlist = Eventlist(
 			from_dl1=True,
-			xml_model_path='/home/usergamma/workspace/dams/dl1/DL1model.xml'
+			xml_model_path='/home/gamma/workspace/dams/dl1/DL1model.xml'
 		)
 
 	def process_data(self, data, priority):

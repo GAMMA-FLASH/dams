@@ -25,12 +25,12 @@
             "result_dataflow_type": "string",
             "result_lp_socket": "tcp://127.0.0.1:5559",
             "result_hp_socket": "tcp://127.0.0.1:5560",
-            "num_workers": 5,
+            "num_workers": 2,
             "name": "dl0todl2",
             "name_workers": "worker"
         }
     ],
-	"logs_path": "/home/usergamma/workspace/Data/logs",
+	"logs_path": "/home/gamma/workspace/Data/Out/logs",
     "logs_level": 3,
     "comment": "datasockettype=pushpull|pubsub|custum dataflowtype=binary|filename|string processingtype=process|thread"
   },
@@ -49,12 +49,12 @@
             "result_dataflow_type": "string",
             "result_lp_socket": "tcp://127.0.0.1:5553",
             "result_hp_socket": "tcp://127.0.0.1:5554",
-            "num_workers": 5,
+            "num_workers": 2,
             "name": "dl0todl1",
             "name_workers": "worker"
         }
     ],
-	"logs_path": "/home/usergamma/workspace/Data/logs",
+	"logs_path": "/home/gamma/workspace/Data/Out/logs",
 	"logs_level": 3,
     "comment": "datasockettype=pushpull|pubsub|custum dataflowtype=binary|filename|string processingtype=process|thread"
   },
@@ -73,12 +73,12 @@
             "result_dataflow_type": "string",
             "result_lp_socket": "tcp://127.0.0.1:5559",
             "result_hp_socket": "tcp://127.0.0.1:5560",
-            "num_workers": 5,
+            "num_workers": 2,
             "name": "dl1todl2",
             "name_workers": "worker"
         }
     ],
-	"logs_path": "/home/usergamma/workspace/Data/logs",
+	"logs_path": "/home/gamma/workspace/Data/Out/logs",
 	"logs_level": 3,
     "comment": "datasockettype=pushpull|pubsub|custum dataflowtype=binary|filename|string processingtype=process|thread"
   },
@@ -97,12 +97,12 @@
             "result_dataflow_type": "none",
             "result_lp_socket": "none",
             "result_hp_socket": "none",
-            "num_workers": 5,
+            "num_workers": 2,
             "name": "dl2chkr",
             "name_workers": "worker"
         }
     ],
-	"logs_path": "/home/usergamma/workspace/Data/logs",
+	"logs_path": "/home/gamma/workspace/Data/Out/logs",
 	"logs_level": 3,
 	"comment": "datasockettype=pushpull|pubsub dataflowtype=binary|filename|string processingtype=process|thread logs_level=1|2|3"
   }

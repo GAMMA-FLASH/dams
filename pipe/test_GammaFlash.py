@@ -6,13 +6,13 @@ from DL1toDL2__service.Supervisor_gflash import Supervisor_DL1toDL2
 
 
 def main():
-    path_dl0='/home/worker/workspace/testgammaflash/Data/data00' 
-    path_dl1='/home/worker/workspace/testgammaflash/Out/data01' 
-    path_dl2='/home/worker/workspace/testgammaflash/Out/data02' 
+    path_dl0='/home/gamma/workspace/Data/DL0' 
+    path_dl1='/home/gamma/workspace/Data/DL1' 
+    path_dl2='/home/gamma/workspace/Data/DL2' 
     socket='tcp://127.0.0.1:5551'
-    json_path_Dl0toDL2='/home/worker/workspace/testgammaflash/DL0toDL2__service/config.json'
-    json_path_Dl0toDL1='/home/worker/workspace/testgammaflash/DL0toDL1__service/config.json'
-    json_path_Dl1toDL2='/home/worker/workspace/testgammaflash/DL1toDL2__service/config.json'
+    json_path_Dl0toDL2='/home/gamma/workspace/dams/DL0toDL2__service/config.json'
+    json_path_Dl0toDL1='/home/gamma/workspace/dams/DL0toDL1__service/config.json'
+    json_path_Dl1toDL2='/home/gamma/workspace/dams/DL1toDL2__service/config.json'
     print(0)
     # Start supervisor for DL0toDL2
     supervisor_DL0toDL2 = Supervisor_DL0toDL2(json_path_Dl0toDL2, 'DL0toDL2')
