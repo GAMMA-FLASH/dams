@@ -17,7 +17,7 @@ get_clients_pids() {
 
 wait_for_termination() {
     local pid=$1
-    local timeout_sec=10
+    local timeout_sec=20
     local timeout=$timeout_sec
 
     while kill -0 "$pid" 2>/dev/null; do
