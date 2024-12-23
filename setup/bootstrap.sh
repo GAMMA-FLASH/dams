@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # Importa la configurazione comune
-source "$(dirname "$0")/.common"
+source "$(dirname "$0")/common_utils.sh"
+
 # Percorso dello script di bootstrap da copiare ed eseguire sui Red Pitaya
 BOOTSTRAP_RP="bootstrap2.sh"
 DEF_USER='root'

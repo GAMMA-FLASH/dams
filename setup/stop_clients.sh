@@ -15,6 +15,7 @@ log_setup() {
 
 SIGNAL="2"
 source "$(dirname "$0")/common_utils.sh"
+check_host_and_activate_python
 cli_argparser
 # Check if DAMS is defined
 if [ -z "$DAMS" ]; then

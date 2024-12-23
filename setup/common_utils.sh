@@ -175,6 +175,15 @@ invalid_bg_fg_selection() {
     log_error "cannot start script with both options background and foreground: $1"; usage;
 }
 
+check_host_and_activate_python() {
+if [ "$(cat /etc/hostname)" = "gamma-flash.iasfbo.inaf.it" ]; then
+    PYTHON=python3.9
+else
+    source activate "$CONDA_ENV_NAME"
+    PYTHON=python
+fi
+}
+
 handle_bg_fg_option() {
     local is_background=$1
     local rp_name=$2
@@ -193,12 +202,7 @@ BACKGROUND=true
 ATTACHED_NAME="all"
 MULTIPROCESSING=""
 CONDA_ENV_NAME="${CONDA_ENV_NAME:-"gammaflash"}"
-if [ "$(cat /etc/hostname)" = "gamma-flash.iasfbo.inaf.it" ]; then
-    PYTHON=python3.9
-else
-    source activate "$CONDA_ENV_NAME"
-    PYTHON=python
-fi
+
 RTADP_START=false
 export PYTHONUNBUFFERED=true
 ####RTADP Configuration:
@@ -276,3 +280,5 @@ echo
 
 log_setup
 }
+
+log_error "ciao"
