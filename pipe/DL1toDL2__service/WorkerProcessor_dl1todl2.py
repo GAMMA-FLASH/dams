@@ -16,11 +16,11 @@ class WorkerDL1toDL2(WorkerBase):
 
 	def process_data(self, data, priority):
 		if self.supervisor.dataflowtype == "binary" or self.supervisor.dataflowtype == "filename":
-			self.logger.critical(f"A string dataflowtype is expected instead of \'{self.supervisor.dataflowtype}\'", extra=self.globalname)
+			self.logger.critical(f"A string dataflowtype is expected instead of \'{self.supervisor.dataflowtype}\'", extra=self.workersname)
 			raise Exception("A string dataflowtype is expected")
 			
 		if self.supervisor.dataflowtype == "string":
-			self.logger.debug(f"\'{data}\'", extra=self.globalname)
+			self.logger.debug(f"\'{data}\'", extra=self.workersname)
 			try:
 				print(data)
 				data = json.loads(data)
@@ -28,13 +28,13 @@ class WorkerDL1toDL2(WorkerBase):
 				dest = data["dest"]
 				# Process DL1 to DL2
 				self.eventlist.process_file(source, None, dest)
-				self.logger.info(f"Processing complete \'{source}\'", extra=self.globalname)
+				self.logger.info(f"Processing complete \'{source}\'", extra=self.workersname)
 				# Get filename
 				filename = os.path.basename(source.replace('.h5', '.dl2.h5'))
 				dl2_filename = os.path.join(dest, filename)
-				self.logger.debug(f"dl2_filename=\'{dl2_filename}\'", extra=self.globalname)
+				self.logger.debug(f"dl2_filename=\'{dl2_filename}\'", extra=self.workersname)
 				# Add message in queue
 				return dl2_filename
 			except Exception as e:
-				self.logger.critical(f"Exception raised:\n{traceback.format_exc()}", extra=self.globalname)
+				self.logger.critical(f"Exception raised:\n{traceback.format_exc()}", extra=self.workersname)
 				return None

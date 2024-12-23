@@ -1,11 +1,12 @@
 FROM oraclelinux:8 AS oracle8
 
 # ---------------------------------- Installing dependencies as root ---------------------------------- 
+RUN dnf update
 RUN dnf install -y epel-release git cmake3 gcc-c++ gcc binutils \
 compat-openssl10 libX11-devel libXpm-devel libXft-devel libXext-devel \ 
 gsl-devel openssl-devel wget bzip2-devel libffi-devel xz-devel sqlite-devel \
 ncurses ncurses-devel make xz libzstd libzstd-devel which rsync \
-nmap-ncat chrony
+nmap-ncat chrony lsof net-tools 
 
 RUN dnf install -y oracle-epel-release-el8
 RUN dnf config-manager --enable ol8_codeready_builder

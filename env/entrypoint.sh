@@ -5,12 +5,13 @@ echo "DAMS: $DAMS"
 echo "RPG_CONFIG: $RPG_CONFIG"
 
 # Nome del vecchio e del nuovo ambiente
-condaenviron="gammaflash"
+condaenviron="gammaenv"
 cd $HOME
 echo "starting gammasky-container"
 source activate $condaenviron
 
-#!/bin/bash
+
+
 
 TOKEN="gf2023#"
 
@@ -22,8 +23,10 @@ nohup jupyter-lab --ip="*" --no-browser --autoreload --NotebookApp.token="$TOKEN
 # Verifica se le variabili sono già presenti
 if ! grep -q "export DAMS=" ~/.bashrc; then
     echo "exporting variables"
-    echo "export DAMS=${DAMS:-/home/usergamma/dams}" >> ~/.bashrc
+    echo "export DAMS=${DAMS:-/home/gamma/workspace/dams}" >> ~/.bashrc
     echo "export RPG_CONFIG=${RPG_CONFIG:-$DAMS/setup/testlab}" >> ~/.bashrc
+    echo "export RTADP_JSON_PATH=${RTADP_JSON_PATH:-/home/gamma/workspace/dams/pipe/config.json}" >> ~/.bashrc
+    echo "export CONDA_ENV_NAME=${CONDA_ENV_NAME:-$condaenviron}" >> ~/.bashrc
 else
     echo "Le variabili di ambiente sono già presenti in .bashrc."
 fi

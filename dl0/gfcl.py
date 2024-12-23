@@ -18,6 +18,7 @@ from time import sleep
 import tables as tb
 import numpy as np
 import configparser
+import json
 
 from enum import Enum
 import influx_utils as influx
@@ -57,13 +58,13 @@ class BaseWorker:
 
 class Recv(BaseWorker):
 
-        def __init__(self, queue, sock, crc_table):
+        def __init__(self, queue, sock, crc_table, rpid):
 
             super().__init__()
             self.pid if use_multiprocessing else threading.get_ident()
             self.queue = queue
             self.sock = sock
-            self.rpId = sock.getpeername()[0][-1]
+            self.rpId = rpid
             self.crc_table = crc_table
             self.data = bytes()
             self.pkt_count = 0
@@ -139,6 +140,7 @@ class Recv(BaseWorker):
         def decode_wform_header(self, header, payload):
             self.wform_seq_count = header[2] & 0x3FFF
             self.wform = Waveform(rpID=header[1] & 0x7F, runID=header[3])
+
             self.wform.read_header(payload)
 
         def decode_wform_data(self, header, payload):
@@ -181,10 +183,11 @@ class Recv(BaseWorker):
 
 class Save(BaseWorker):
 
-        def __init__(self, queue, outdir, wformno, spectrum_cfg):
+        def __init__(self, queue, outdir, wformno, spectrum_cfg, dl0dl2_pipeline, socket_rtadp=None):
             super().__init__()
             self.pid if use_multiprocessing else threading.get_ident()
             self.queue = queue
+            self.socket_rtadp=socket_rtadp
             self.outdir = outdir
             self.dl2_dir = self.outdir.replace("DL0","DL2")
             self.wformno = wformno
@@ -196,6 +199,7 @@ class Save(BaseWorker):
             self.wform_count = 0
             self._point = None
             self.spectrum_cfg = spectrum_cfg
+            self.dl0dl2_pipeline = dl0dl2_pipeline
             self.output_path = None
             self.file_idx = 0
             if self.spectrum_cfg['Enable']:
@@ -280,11 +284,12 @@ class Save(BaseWorker):
                     if influx.HAS_INFLUX_DB_COUNTS:
                     
 
-                        if influx.INFLUX_WF_TIMESTAMP == TimestampOptions.RedPitaya: 
+                        if influx.INFLUX_WF_TIMESTAMP == influx.TimestampOptions.RedPitaya: 
                             time_ms = math.trunc((packet.tstart) * 1000) 
                         else: 
                             time_ms = math.trunc(time.time() * 1000) 
                         rpid = packet.rpID
+                        print(f"INFO -- {rpid}")
                         if self._point is None:
                             self._point = Point("RPG%1d" % rpid).field("count", 1).time(time_ms, WritePrecision.MS)
                         else: 
@@ -311,6 +316,8 @@ class Save(BaseWorker):
                                             
                         if self.spectrum_cfg['Enable']:
                             self.start_spectrum_an(filename=filename)
+                        if self.dl0dl2_pipeline['Enable']:
+                            self.send_rtadp_filename_spectrum_an(filename=filename)
 
                         self.flush_data()
 
@@ -332,6 +339,8 @@ class Save(BaseWorker):
                                             
                 if self.spectrum_cfg['Enable']:
                     self.start_spectrum_an(filename=filename)
+                if self.dl0dl2_pipeline['Enable']:
+                    self.send_rtadp_filename_spectrum_an(filename=filename)
             print('Dump queue')
 
         def start_spectrum_an(self, filename):
@@ -346,6 +355,26 @@ class Save(BaseWorker):
             print("DEBUG - process command: ", spectrum_cmd)
 
             subprocess.Popen(spectrum_cmd, shell=True)
+
+        def send_rtadp_filename_spectrum_an(self, filename):
+            inputfile = filename + '.h5'
+            # output_log = self.output_path.joinpath(f"{str(Path(filename).name)}.log")
+            
+            # cmd=[
+            #     f"source activate {self.spectrum_cfg['Venv']}",
+            #     f"python {os.path.expandvars(self.spectrum_cfg['ProcessName'])} --outdir {self.dl2_dir} {self.spectrum_cfg['ProcessArgs']} --filename {inputfile} > {output_log} 2>&1"
+            # ]
+            # spectrum_cmd = " && ".join(cmd)
+            # print("DEBUG - process command: ", spectrum_cmd)
+            data = {"path_dl0_folder": os.path.dirname(inputfile), 
+                    "path_dl1_folder": dl0dl2_pipeline['dl1_dir'], 
+                    "path_dl2_folder": dl0dl2_pipeline['dl2_dir'], 
+                    "filename":        os.path.basename(inputfile)}
+            # Dump message
+            message = json.dumps(data)
+            self.socket_rtadp.send_string(message)
+            print("DEBUG - data sent: ", data)
+            # subprocess.Popen(spectrum_cmd, shell=True)s
 
         def dump_packets(self) -> str:
             # Note that the time needed to write the data is a function of the number of I/O ops
@@ -415,8 +444,9 @@ class Save(BaseWorker):
 
             h5_out.close()
             # Create the OK file
-            ok_out = open(fname + '.h5.ok', 'w')
-            ok_out.close()
+            # if self.dl0dl2_pipeline['Enable']:
+            #     ok_out = open(fname + '.h5.ok', 'w')
+            #     ok_out.close()
 
             return fname
         
@@ -473,6 +503,7 @@ if __name__ == '__main__':
 
     # Configure input arguments
     parser = argparse.ArgumentParser(prog='gfcl', description=DESCRIPTION)
+    parser.add_argument('--rpid', type=str, help='The Redpitaya Identifier in the .cfg file', required=True)
     parser.add_argument('--addr', type=str, help='The Redpitaya IP address', required=True)
     parser.add_argument('--port', type=int, help='The Redpitaya port', required=True)
     parser.add_argument('--outdir', type=str, help='Output Directory', required=True)
@@ -501,6 +532,32 @@ if __name__ == '__main__':
             'ProcessArgs' : cfg['SPECTRUM_AN'].get('ProcessArgs'),
             'ProcessOut' : cfg['SPECTRUM_AN'].get('ProcessOut')
             }
+
+    dl0dl2_pipeline={
+            'Enable' : cfg['DL0DL2_PIPE'].getboolean('Enable'), 
+            'json_data': os.getenv(cfg['DL0DL2_PIPE'].get('RTADPCONFIG_VAR')),
+            'dl1_dir': os.getenv(cfg['DL0DL2_PIPE'].get('RTADPDL1OUT_VAR')),
+            'dl2_dir': os.getenv(cfg['DL0DL2_PIPE'].get('RTADPDL2OUT_VAR')),
+            }
+    
+    if dl0dl2_pipeline['Enable']:
+        print("INFO- RTADP enabled")
+        from ConfigurationManager import ConfigurationManager
+        import zmq
+        context = zmq.Context()
+        cfgman= ConfigurationManager(dl0dl2_pipeline['json_data'])
+        socketto_san=cfgman.get_configuration("DL0toDL1")["data_lp_socket"]
+        print("----------->", socketto_san)
+        socket_zmq=context.socket(zmq.PUSH)
+        try:
+            socket_zmq.connect(socketto_san)
+            print("INFO- Connected to : ", socket_zmq)
+        except Exception as e:
+            print(f"ERROR: cannot connect to rtadp. Reason: {e}")
+            dl0dl2_pipeline['Enable'] = False
+        
+    else: 
+        socket_zmq=None
 
     # ----------------------------------
     # Open socket
@@ -543,7 +600,7 @@ if __name__ == '__main__':
 
     signal.signal(signal.SIGINT, signal_handler)
 
-    save_thread : Union[Process, Thread] = Dyn_Save(queue, args.outdir, args.wformno, spectrum_cfg)
+    save_thread : Union[Process, Thread] = Dyn_Save(queue, args.outdir, args.wformno, spectrum_cfg, dl0dl2_pipeline, socket_zmq)
     save_thread.start()
 
     sleep(1)
@@ -551,7 +608,7 @@ if __name__ == '__main__':
     # Create CRC table
     crc_table = crc32_fill_table(0x05D7B3A1)
 
-    recv_thread : Union[Process, Thread] = Dyn_Recv( queue, sock, crc_table)
+    recv_thread : Union[Process, Thread] = Dyn_Recv( queue, sock, crc_table, args.rpid)
     recv_thread.start()
 
     # ----------------------------------
@@ -582,5 +639,10 @@ if __name__ == '__main__':
     stop_save.set()
     print('INFO: Main: Stop save thread')
     save_thread.join()
+
+    if dl0dl2_pipeline['Enable']:
+        socket_zmq.setsockopt(zmq.LINGER, 0)  # Imposta la chiusura immediata
+        socket_zmq.close()
+        context.destroy()
 
     print('End')

@@ -4,7 +4,7 @@ Test = no
 [INFLUXDB]
 Enable_Counts = no
 Enable_Hk = yes
-URL = 172.17.0.7:8086
+URL = 172.17.0.3:8086
 Token = LAEwTJwgWsPuv4YP00KRcw9iRhis3vzK8agBjn0OhZqqpmxEFjT7RlWCcHszqG7m_8gCnTNasxqlzE1WUm-Wgg==
 Org = GAMMA-SKY
 Bucket = RP-COUNTS
@@ -19,4 +19,11 @@ Venv = gammaflash
 ProcessName = /home/usergamma/workspace/dams/dl2/eventlist_v4.py
 ProcessArgs =  
 ProcessOut = /home/usergamma/logs
+
+[DL0DL2_PIPE]
+Enable = yes
+RTADPCONFIG_VAR = RTADP_JSON_PATH
+RTADPDL1OUT_VAR = DL1DIR
+RTADPDL2OUT_VAR = DL2DIR
+
 

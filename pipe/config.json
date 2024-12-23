@@ -1,10 +1,10 @@
 [
 	{
         "processname": "Monitoring",
-        "monitoring_forwarder":"off",
-        "forwarder_frontend_socket": "none",
-        "forwarder_backend_socket": "none",
-        "monitoring_socket": "tcp://127.0.0.1:5552"
+        "monitoring_forwarder":"on",
+        "forwarder_frontend_socket": "tcp://127.0.0.1:5552",
+        "forwarder_backend_socket": "tcp://127.0.0.1:5562",
+        "monitoring_socket": "tcp://127.0.0.1:5562"
     },
 	{
         "processname": "CommandCenter",
@@ -14,7 +14,7 @@
 	"processname": "DL0toDL2",
 	"dataflow_type": "string",
 	"processing_type": "process",
-	"datasocket_type": "pubsub",
+	"datasocket_type": "pushpull",
 	"data_lp_socket": "tcp://127.0.0.1:5555",
 	"data_hp_socket": "tcp://127.0.0.1:5556",
 	"command_socket": "tcp://127.0.0.1:5551",
@@ -38,7 +38,7 @@
 	"processname": "DL0toDL1",
 	"dataflow_type": "string",
 	"processing_type": "process",
-	"datasocket_type": "pubsub",
+	"datasocket_type": "pushpull",
 	"data_lp_socket": "tcp://127.0.0.1:5555",
 	"data_hp_socket": "tcp://127.0.0.1:5556",
 	"command_socket": "tcp://127.0.0.1:5551",
