@@ -177,11 +177,14 @@ invalid_bg_fg_selection() {
 
 check_host_and_activate_python() {
 if [ "$(cat /etc/hostname)" = "gamma-flash.iasfbo.inaf.it" ]; then
+    
     PYTHON=python3.9
 else
+    log_message "activating conda env. '$CONDA_ENV_NAME'"
     source activate "$CONDA_ENV_NAME"
     PYTHON=python
 fi
+log_message "Using python v. ${PYTHON}"
 }
 
 handle_bg_fg_option() {
