@@ -4,7 +4,7 @@
 
 `DAMS` is the folder pointing to the dams repository root folder.
 `RPG_CONFIG` is the path to folder or to configuration file `RPGLIST.cfg` of a deployment setup
-`ODIR` is the DL0 and DL2 output folder for the current obervation.
+`DL0DIR` is the DL0 and DL2 output folder for the current obervation.
 
 ## create a symbolic link to gammaflash client configuration .ini file
 

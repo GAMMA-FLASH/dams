@@ -3,7 +3,7 @@ Data Acquisition Modules (DAMS) is a C/Python software used for getting the GAMM
 
 # Client Enviroment
 define DAMS variable in the client machine, pointing to the ROOT of the https://github.com/GAMMA-FLASH/dams repository
-to store data, define "ODIR" variable pointing to the output directory 
+to store data, define "DL0DIR" variable pointing to the output directory 
 
 ## Install dam software on RP
 Manually clone the source code in RP. assume them connected to network
@@ -38,7 +38,7 @@ To run the acquisition
 ```
 python gfcl.py --rp_ip X.X.X.X --rp_port Y --rp_id Z --outdir "outdir" --nwfs 10000
 ```
-or define ODIR variable
+or define DL0DIR variable
 ```
 
 ```

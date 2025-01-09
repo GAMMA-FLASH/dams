@@ -10,13 +10,13 @@ usage() {
 log_setup() {
     echo
     log_message "Stopping gammaflash clients. Selected rpId: '${ATTACHED_NAME}'"
+    log_message "Stop rtadp: ${RTADP_START}"
     echo
 }
-
 SIGNAL="2"
 source "$(dirname "$0")/common_utils.sh"
 check_host_and_activate_python
-cli_argparser
+cli_argparser $@
 # Check if DAMS is defined
 if [ -z "$DAMS" ]; then
     echo "DAMS root not defined"
@@ -81,4 +81,8 @@ process_file_with_function check_client_to_terminate
 
 wait
 
-stop_rtadp 
+if [ "$RTADP_START" == "true" ]; then 
+    log_message "Time to stop rtadp..."
+    stop_rtadp 
+
+fi

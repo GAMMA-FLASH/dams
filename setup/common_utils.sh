@@ -97,6 +97,7 @@ start_rtadp() {
 
     # Controlla l'exit code
     if [ $exit_code -eq 0 ]; then
+        command="start all"
         $PYTHON $SNDcom start all
         log_message "RTADP $command sent..."
     else
@@ -235,7 +236,6 @@ if [ -n "$RPG_CONFIG" ]; then
 fi
 
 cli_argparser () {
-log_error "parsing args"
 # Parsing degli argomenti della riga di comando
 while [[ "$#" -gt 0 ]]; do
     case $1 in
@@ -283,5 +283,3 @@ echo
 
 log_setup
 }
-
-log_error "ciao"

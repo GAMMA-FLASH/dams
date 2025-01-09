@@ -17,7 +17,7 @@ build_gfcl_command() {
     local wformno="$4"
 
     # Costruisci e ritorna la stringa del comando
-    echo "$PYTHON $GFCL --rpid \"$rp_name\" --addr \"$addr\" --port \"$port\" --outdir \"$ODIR/RPG$rp_name/35mV/\" --wformno \"$wformno\" $MULTIPROCESSING"
+    echo "$PYTHON $GFCL --rpid \"$rp_name\" --addr \"$addr\" --port \"$port\" --outdir \"$DL0DIR/RPG$rp_name/35mV/\" --wformno \"$wformno\" $MULTIPROCESSING"
 
 }
 
@@ -49,16 +49,12 @@ check_client_to_start () {
     # Esecuzione del comando con i parametri letti
     if [ "$BACKGROUND" = true ]; then
         if [ "$ATTACHED_NAME" = "$rp_name" ] || [ "$ATTACHED_NAME" = "all" ]; then
-            # Lancia in background
-            echo "entering here.."
             command_string=$(build_gfcl_command $addr $port $rp_name $wformno)
             log_message "Client started with: \" $command_string\""
             nohup bash -c "$command_string" > "$DL0_LOGS/gfcl_RPG$rp_name.log" 2>&1 &
         fi
         
     elif [ "$ATTACHED_NAME" = "$rp_name" ] || ( [ -z "$ATTACHED_NAME" ] && [ "$rp_name" = "$FIRST_RPG_NAME" ] ); then
-        # Lancia in foreground se corrisponde il nome o se ATTACHED_NAME è vuoto e corrisponde al primo RPG
-        echo "entering here2.."
         echo "Launched RPG: $rp_name"
         eval $(build_gfcl_command "$addr" "$port" "$rp_name" "$wformno")
 
@@ -76,12 +72,12 @@ DL0_LOGS=$DAMS/logs/dl0
 RTADP_LOGS=$DAMS/logs/rtadp
 
 
-# Check if ODIR is defined
-if [ -z "$ODIR" ]; then
-    echo "ODIR not defined"
+# Check if DL0DIR is defined
+if [ -z "$DL0DIR" ]; then
+    echo "DL0DIR not defined"
     exit 1
 else 
-    log_message "ODIR is set to: $ODIR"
+    log_message "DL0DIR is set to: $DL0DIR"
 fi
 
 # Check if DAMS is defined
