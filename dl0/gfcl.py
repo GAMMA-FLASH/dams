@@ -19,6 +19,7 @@ import tables as tb
 import numpy as np
 import configparser
 import json
+import zmq
 
 from enum import Enum
 import influx_utils as influx
@@ -183,11 +184,10 @@ class Recv(BaseWorker):
 
 class Save(BaseWorker):
 
-        def __init__(self, queue, outdir, wformno, spectrum_cfg, dl0dl2_pipeline, socket_rtadp=None):
+        def __init__(self, queue, outdir, wformno, spectrum_cfg, dl0dl2_pipeline):
             super().__init__()
             self.pid if use_multiprocessing else threading.get_ident()
             self.queue = queue
-            self.socket_rtadp=socket_rtadp
             self.outdir = outdir
             self.dl2_dir = self.outdir.replace("DL0","DL2")
             self.wformno = wformno
@@ -202,17 +202,14 @@ class Save(BaseWorker):
             self.dl0dl2_pipeline = dl0dl2_pipeline
             self.output_path = None
             self.file_idx = 0
-            if self.spectrum_cfg['Enable']:
-                try:
-                    expanded_process_out_value = os.path.expandvars(self.spectrum_cfg['ProcessOut'])
-                    self.output_path = Path(expanded_process_out_value)
-                    os.makedirs(self.output_path, exist_ok=True)
-                except TypeError as e:
-                    print("WARNING: DL2 output log folder not provided.")
+            self._configure_influxdb()
+            self._configure_spectrum_an()
+            
+        def _configure_influxdb(self):
             # ------------------------------------------------------------------ #
             # Setup influx DB                                                    #
             # ------------------------------------------------------------------ #
-
+    
             if influx.HAS_INFLUX_DB_COUNTS or influx.HAS_INFLUX_DB_HK :
                 self.org = influx.INFLUX_DB_ORG
                 self.client = InfluxDBClient(url=influx.INFLUX_DB_URL, token=influx.INFLUX_DB_TOKEN, org=self.org)
@@ -235,6 +232,7 @@ class Save(BaseWorker):
                 else:
                     self.bucketHk = None
                     self.write_api_hk = None
+                print("SAVE-Influxdb configured")
 
             else:
                 self.client = None
@@ -242,7 +240,52 @@ class Save(BaseWorker):
                 self.bucket = None
                 self.org = None
 
+        def _configure_spectrum_an(self):
+            # ------------------------------------------------------------------ #
+            # Setup spectrum analysis (DL2 via eventlistv4)                      #
+            # ------------------------------------------------------------------ #
+    
+            if self.spectrum_cfg['Enable']:
+                try:
+                    expanded_process_out_value = os.path.expandvars(self.spectrum_cfg['ProcessOut'])
+                    self.output_path = Path(expanded_process_out_value)
+                    os.makedirs(self.output_path, exist_ok=True)
+                    print("SAVE-spectrum analysis configured")
+                except TypeError as e:
+                    print("WARNING: DL2 output log folder not provided.")
+
+        def _configure_rtadp(self):
+            # ------------------------------------------------------------------ #
+            # Setup rta-dp (DL1-DL2 production)                                  #
+            # ------------------------------------------------------------------ #
+            if self.dl0dl2_pipeline['Enable']:
+                
+                from ConfigurationManager import ConfigurationManager
+                self.context = zmq.Context()
+                cfgman= ConfigurationManager(dl0dl2_pipeline['json_data'])
+                socketto_san=cfgman.get_configuration("DL0toDL1")["data_lp_socket"]
+                print("----------->", socketto_san)
+                self.socket_rtadp=self.context.socket(zmq.PUSH)
+                try:
+                    self.socket_rtadp.connect(socketto_san)
+                    print("SAVE- Connected to : ", self.socket_rtadp)
+                    print("SAVE- RTADP enabled")
+                except Exception as e:
+                    dl0dl2_pipeline['Enable'] = False
+                    print(f"ERROR: cannot connect to rtadp. Reason: {e}")
+            
+            else: 
+                self.socket_rtadp=None
+
+        def _close_rtadp_connection(self):
+            if dl0dl2_pipeline['Enable']:
+                self.socket_rtadp.setsockopt(zmq.LINGER, 0)  # Imposta la chiusura immediata
+                self.socket_rtadp.close()
+                self.context.destroy()
+                print("SAVE- RTADP connection closed")
+
         def run(self):
+            self._configure_rtadp()
             conditional_signal_handler(self.__class__)
             # Create output directory (if needed)
             os.makedirs(self.outdir, exist_ok=True)
@@ -342,6 +385,7 @@ class Save(BaseWorker):
                 if self.dl0dl2_pipeline['Enable']:
                     self.send_rtadp_filename_spectrum_an(filename=filename)
             print('Dump queue')
+            self._close_rtadp_connection()
 
         def start_spectrum_an(self, filename):
             inputfile = filename + '.h5'
@@ -539,25 +583,6 @@ if __name__ == '__main__':
             'dl1_dir': os.getenv(cfg['DL0DL2_PIPE'].get('RTADPDL1OUT_VAR')),
             'dl2_dir': os.getenv(cfg['DL0DL2_PIPE'].get('RTADPDL2OUT_VAR')),
             }
-    
-    if dl0dl2_pipeline['Enable']:
-        print("INFO- RTADP enabled")
-        from ConfigurationManager import ConfigurationManager
-        import zmq
-        context = zmq.Context()
-        cfgman= ConfigurationManager(dl0dl2_pipeline['json_data'])
-        socketto_san=cfgman.get_configuration("DL0toDL1")["data_lp_socket"]
-        print("----------->", socketto_san)
-        socket_zmq=context.socket(zmq.PUSH)
-        try:
-            socket_zmq.connect(socketto_san)
-            print("INFO- Connected to : ", socket_zmq)
-        except Exception as e:
-            print(f"ERROR: cannot connect to rtadp. Reason: {e}")
-            dl0dl2_pipeline['Enable'] = False
-        
-    else: 
-        socket_zmq=None
 
     # ----------------------------------
     # Open socket
@@ -600,7 +625,7 @@ if __name__ == '__main__':
 
     signal.signal(signal.SIGINT, signal_handler)
 
-    save_thread : Union[Process, Thread] = Dyn_Save(queue, args.outdir, args.wformno, spectrum_cfg, dl0dl2_pipeline, socket_zmq)
+    save_thread : Union[Process, Thread] = Dyn_Save(queue, args.outdir, args.wformno, spectrum_cfg, dl0dl2_pipeline)
     save_thread.start()
 
     sleep(1)
@@ -639,10 +664,5 @@ if __name__ == '__main__':
     stop_save.set()
     print('INFO: Main: Stop save thread')
     save_thread.join()
-
-    if dl0dl2_pipeline['Enable']:
-        socket_zmq.setsockopt(zmq.LINGER, 0)  # Imposta la chiusura immediata
-        socket_zmq.close()
-        context.destroy()
 
     print('End')
