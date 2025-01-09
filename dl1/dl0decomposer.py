@@ -18,8 +18,10 @@ class DL0Decomposer():
         self.wfdl0   = wfdl0
         self.idx     = idx
         self.name    = name
-        self.mmean1  = np.mean(self.wfdl0[:100, -1])
-        self.stdev1  = np.std(self.wfdl0[:100, -1])
+        #self.data    = self.wfdl0[:, -1]  + self.arr_bias
+        self.data    = self.wfdl0[:, -1]
+        self.mmean1  = np.mean(self.data[:100])
+        self.stdev1  = np.std(self.data[:100])
         self.meanblocks = np.lib.stride_tricks.sliding_window_view(self.wfdl0[:, -1], self.blocksSize_dblEvent)
         self.meanblocks = self.meanblocks.mean(axis=1)
         self.wvfrsdl1List = []
@@ -32,18 +34,19 @@ class DL0Decomposer():
         * `x`: is the data array for which you want to calculate the moving average.
         * `w`: is the width of the moving average window.
         """
-        return np.convolve(x, np.ones(w), 'valid') / w
+        return np.convolve(x, np.ones(w), 'same') / w
     
     def __get_peak_lists(self):  # OK
         """
         This function returns the list of peaks found in each waveform.
         """
         # Extract array
-        arr = self.wfdl0[:,-1]
+        arr = self.data
         # Compute moving average
         arrmov = self.__moving_average(arr, 15)
         #
-        mmean2 = self.mmean1 * 2 * 0.9 
+        mmean2 = self.mmean1 * 2 * 0.9
+        # mmean2 = self.mmean1 + self.stdev1 * 1.96 
         # Find peaks
         peaks, _ = find_peaks(arrmov, height=mmean2, width=15, distance=25)
         # Clone the peaks

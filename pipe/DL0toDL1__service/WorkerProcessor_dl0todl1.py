@@ -4,12 +4,14 @@ import os
 import json
 import traceback
 
+DL02DL2_DETECTOR_CFG_ENV="DL02DL2_DETECTOR_CFG"
+DEFAULT_CFG='/home/gamma/workspace/dams/dl1/dl02dl1_config_SiPM.json'
 class WorkerDL0toDL1(WorkerBase):
 	def __init__(self):
 		super().__init__()
 		# Create for eventlist
 		self.snapeventlist = EventlistSnapshot(
-			'/home/gamma/workspace/dams/dl1/dl02dl1_config.json', # Config file
+			os.getenv(DL02DL2_DETECTOR_CFG_ENV, DEFAULT_CFG), # Config file
 			'/home/gamma/workspace/dams/dl1/DL1model.xml'		  # XML model
 		)
 

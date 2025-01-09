@@ -73,15 +73,15 @@ if __name__ == "__main__":
     path_dl0, path_dl1, path_dl2 = sys.argv[1], sys.argv[2], sys.argv[3] 
     # Get the socket name where publishing the file name to process from DL0 to DL2
     socketstring = sys.argv[4]
-    countdown=10
+    countdown=0
     for i in range(countdown):
         print(f"{countdown-i}")
         time.sleep(1)
     time_sleep_inframessage = float(sys.argv[5])
     # Bind socket
     context = zmq.Context()
-    socket = context.socket(zmq.PUB)
-    socket.bind(socketstring)
+    socket = context.socket(zmq.PUSH)
+    socket.connect(socketstring)
     # Publish DL0 files recursive mode
     publish(path_dl0, path_dl1, path_dl2, True, socket, time_sleep_inframessage)
     

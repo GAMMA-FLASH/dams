@@ -142,7 +142,7 @@ class EventlistSnapshot():
             else:
                 print(f"Il file '{nome_file}' non empty.")
         else:
-            print(f"Il file '{nome_file}' non esiste.")
+            print(f"Il file '{nome_file}' non esiste. continuo...")
             
 
     def create_directory(self, directory_path):
