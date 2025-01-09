@@ -13,6 +13,18 @@ log_setup() {
     log_message "Stop rtadp: ${RTADP_START}"
     echo
 }
+
+stop_rtadp_async () {
+    sleep_s=10
+    if [ "$RTADP_START" == "true" ]; then 
+        log_message "rtadp will stop in $sleep_s seconds ..."
+        sleep $sleep_s
+        echo 
+        log_message "Time to stop rtadp..."
+        stop_rtadp 
+    fi
+}
+
 SIGNAL="2"
 source "$(dirname "$0")/common_utils.sh"
 check_host_and_activate_python
@@ -81,8 +93,4 @@ process_file_with_function check_client_to_terminate
 
 wait
 
-if [ "$RTADP_START" == "true" ]; then 
-    log_message "Time to stop rtadp..."
-    stop_rtadp 
-
-fi
+stop_rtadp_async &
