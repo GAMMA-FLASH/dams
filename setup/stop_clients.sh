@@ -1,15 +1,17 @@
 #!/bin/bash
 
+source "$(dirname "$0")/common_utils.sh"
+
 usage() {
-    log_message "Usage: $0 [--config <RPG_config_or_directory>] [--attached [RPGNAME]]"
-    log_message "Usage: $0 [-c <RPG_config_or_directory>] [-a [RPGNAME]]"
+    log_message "Usage: $0 [--config <RPG_config_or_directory>] [--ip <RPGNAME>]"
+    log_message "Usage: $0 [-c <RPG_config_or_directory>] [-i <RPGNAME>]"
     log_message "RPGNAME one of the ones defined in .cfg"
     exit 1
 }
 
 log_setup() {
     echo
-    log_message "Stopping gammaflash clients. Selected rpId: '${ATTACHED_NAME}'"
+    log_message "Stopping gammaflash clients. Selected rpIds: '${ATTACHED_NAMES[*]:-all}'"
     log_message "Stop rtadp: ${RTADP_START}"
     echo
 }
@@ -26,7 +28,7 @@ stop_rtadp_async () {
 }
 
 SIGNAL="2"
-source "$(dirname "$0")/common_utils.sh"
+
 check_host_and_activate_python
 cli_argparser $@
 # Check if DAMS is defined
@@ -77,19 +79,20 @@ terminate_client() {
     fi
 }
 
-check_client_to_terminate () {
+choose_and_stop () {
     ### "$rp_name" "$addr" "$port" "$wformno"
     local rp_name=$1
     local addr=$2
     local port=$3
     local wformno=$4
-    if [ -z "$ATTACHED_NAME" ] || [ "$ATTACHED_NAME" = "$rp_name" ] || [ "$ATTACHED_NAME" = "all" ]; then
+    if [ -z "$ATTACHED_NAMES" ] || [[ " ${ATTACHED_NAMES[*]} " =~ " ${rp_name} " ]] || [ ${#ATTACHED_NAMES[@]} -eq 0 ]; then
+
         # Termina il rp specificato
         terminate_client "$rp_name" "$addr" "$port" &
     fi
 }
 
-process_file_with_function check_client_to_terminate
+process_file_with_function choose_and_stop
 
 wait
 

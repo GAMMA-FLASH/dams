@@ -2,15 +2,17 @@
 set -e
 set +v
 
+
+source "$(dirname "$0")/common_utils.sh"
+
 log_setup() {
     echo
     log_message "Background execution: ${BACKGROUND}"
-    log_message "Starting rpId: ${ATTACHED_NAME}"
+    log_message "Starting rpIds: ${ATTACHED_NAMES[*]:-all}"
     echo
 }
 
-# Importa la configurazione comune
-source "$(dirname "$0")/common_utils.sh"
+
 cli_argparser $@
 
 # Percorso dello script di bootstrap locale
@@ -18,7 +20,7 @@ BOOTSTRAP_RP="$DAMS/setup/gfpl/rp/bootstrapv2-rp.sh"
 DEF_USER='root'
 
 bootstrap() {
-    local HOST="$2"
+    local HOST="$1"
     echo -e "\e[32m================ Bootstrapping RPG at addr: $HOST ================\e[0m"
     current_time=$(date -u "+%Y-%m-%d %H:%M:%S")
 
@@ -44,4 +46,12 @@ if [ -n "$ATTACHED_NAME" ]; then
     log_message "Bootstrapping only RPG: $ATTACHED_NAME"
 fi
 
-process_file_with_function bootstrap
+choose_and_bootstrap() {
+    local HOST=$2
+    if [[ " ${ATTACHED_NAMES[*]} " =~ " ${rp_name} " ]] || [ ${#ATTACHED_NAMES[@]} -eq 0  ]; then
+        log_message "Bootstrapping RPG: $rp_name"
+        bootstrap $HOST
+    fi
+}
+
+process_file_with_function choose_and_bootstrap

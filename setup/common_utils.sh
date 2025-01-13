@@ -1,5 +1,13 @@
 #!/bin/bash
 
+usage () {
+    log_error "define custom usage"
+}
+
+log_setup() {
+    log_error "define custom log_setup"
+}
+
 log_message() {
     local message="$@"
     echo -e "\e[33m[INFO] \e[0m$message"
@@ -8,6 +16,16 @@ log_message() {
 log_error() {
     local message="$@"
     echo -e "\e[31m[ERROR] \e[0m$message"
+}
+
+exit_safe() {
+    local code=$1
+    # Verifica se la shell è interattiva
+        if [[ $- == *i* ]]; then
+            return $1  # Ritorna un codice di errore senza chiudere il terminale
+        else
+            exit $1 # Esci con errore se usato in uno script
+        fi
 }
 
 process_file_with_function() {
@@ -45,11 +63,11 @@ submit_rtadp_dl0_dl1_dl2_consumers() {
 
     if [ -z "$RTADP_JSON_PATH" ]; then
         echo "RTADP_JSON_PATH not defined."
-        exit 1
+        exit_safe 1
     fi
     if [[ -z "$DL1DIR" && -z "$DL2DIR" ]]; then
         log_error "RTA DP directories are not defined."
-        exit 1
+        exit_safe 1
     fi
     log_message "RTADP_JSON_PATH is set to: $RTADP_JSON_PATH"
     # do NOT reduce code lines here ######
@@ -174,6 +192,7 @@ submit_job_once() {
 
 invalid_bg_fg_selection() {
     log_error "cannot start script with both options background and foreground: $1"; usage;
+    exit_safe 1
 }
 
 check_host_and_activate_python() {
@@ -188,13 +207,40 @@ fi
 log_message "Using python v. ${PYTHON}"
 }
 
+get_rp_names() {
+    local name=$1
+    echo "$name"
+}
+
+check_all_in_list() {
+    local -n list1=$1  # Prima lista (passata per nome)
+    local -n list2=$2  # Seconda lista (passata per nome)
+    for item in "${list1[@]}"; do
+        if ! [[ " ${list2[*]} " =~ " ${item} " ]]; then
+            log_error "Cannot find element: $item"
+            log_error "Select one of the following names:"
+            process_file_with_function get_rp_names
+            exit 1
+        fi
+    done
+    return 0
+}
+
+
+rp_name_validator() {
+    local -n inputnames=$1
+    local NAMES+=($(process_file_with_function get_rp_names))
+    # echo ${NAMES[@]}
+    # echo ${inputnames[@]}
+    check_all_in_list inputnames NAMES
+}
+
 handle_bg_fg_option() {
     local is_background=$1
     local rp_name=$2
     if [ -z "${bg_or_fg}" ]; then
         BACKGROUND=$is_background
         bg_or_fg=chosen
-        ATTACHED_NAME="$rp_name"
     else
         invalid_bg_fg_selection
     fi
@@ -203,7 +249,7 @@ handle_bg_fg_option() {
 # Inizializza variabili
 GFCL=${GFCL:-"$DAMS/dl0/gfcl.py"}
 BACKGROUND=true
-ATTACHED_NAME="all"
+ATTACHED_NAMES=()
 MULTIPROCESSING=""
 CONDA_ENV_NAME="${CONDA_ENV_NAME:-"gammaflash"}"
 
@@ -243,13 +289,18 @@ while [[ "$#" -gt 0 ]]; do
             RPG_CONFIG="$2"
             shift ;;
         --rtadp|-r)
-            log_error "setting RTADP_START"
             RTADP_START=true ;;
-        --background|-b) 
-            handle_bg_fg_option true "$2"
+        --version|-v)
+            log_error "setting version: $2"
+            BRANCH_NAME=$2
             shift ;;
+        --background|-b) 
+            handle_bg_fg_option true ;;
         --attached|-a)
-            handle_bg_fg_option false "$2"
+            handle_bg_fg_option false ;;
+        --ip|-i)
+            RP_NAME="$2"
+            ATTACHED_NAMES+=("$RP_NAME")  
             shift ;;
         --multiprocessing|-m) MULTIPROCESSING="--multiprocessing" ;;
         --help|-h)
@@ -263,7 +314,7 @@ done
 if [ -z "$RPG_CONFIG" ]; then
     log_error "RPG_CONFIG not defined. Please set it as an environment variable or use --config."
     usage
-    exit 1
+    exit_safe 1
 fi
 RPG_DEFAULT_FILE="RPGLIST.cfg"
 if [ -d "$RPG_CONFIG" ]; then
@@ -273,13 +324,20 @@ fi
 if [ ! -e "$RPG_CONFIG" ]; then
     log_error "Config file $RPG_CONFIG does not exist."
     usage
-    exit 1
+    exit_safe 1
 fi
 # Risolvi il percorso assoluto per RPG_CONFIG
 export RPG_CONFIG=$(readlink -f "$RPG_CONFIG")
 
 echo -e "\033[0;32m -- Using Red Pitaya deployment configuration: $RPG_CONFIG\033[0m"
 echo 
+rp_name_validator ATTACHED_NAMES
 
-log_setup
+if declare -F log_setup >/dev/null 2>&1; then
+        # log_setup è definita, chiamala
+        log_setup
+    else
+        # log_setup non è definita, non fare nulla
+        log_error "log_setup not defined."
+    fi
 }

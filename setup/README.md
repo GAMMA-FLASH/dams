@@ -3,14 +3,20 @@
 ## set env vars
 
 `DAMS` is the folder pointing to the dams repository root folder.
-`RPG_CONFIG` is the path to folder or to configuration file `RPGLIST.cfg` of a deployment setup
-`DL0DIR` is the DL0 and DL2 output folder for the current obervation.
+`RPG_CONFIG` is the path to folder or to configuration file `RPGLIST.cfg` of a deployment setup.
+`DL0DIR` is the DL0 output folder for the current observation.
+`DL1DIR` is the DL1 output folder for the current observation.
+`DL2DIR` is the DL2 output folder for the current observation.
 
-## create a symbolic link to gammaflash client configuration .ini file
+you can find the helper script: `setup/output_directories.sh` to rapid setup all the vars:
+```[bash]
+source $DAMS/setup/output_directories.sh /common/base/path
+```
+## Configuration
 
-```
-ln -s </path/to/gfcl.machine.ini> $DAMS/dl0/gfcl.ini
-```
+the following steps refer to a proper configured enviroment.
+Refer to `README.md, sec. 'Client Environment Configuration'` to setup the environment
+
 
 ## setup current time on main computer
 
@@ -25,7 +31,7 @@ date -s 2024-08-06 13:24:50
 ## deployment configuration
 deployment configuration are inside `setup/<deployment_name>` folder.
 `RPGLIST.cfg` is the file used from start.sh utility to start all gammaflash client for each RedPitaya.
-RPG List contains one line for each Red Pitaya, with the following informations:
+RPG List contains one line for each Red Pitaya with the following informations:
 ```
 <rpg_name_x>,<ip address>,<port>,<waveform_number>
 ```
@@ -33,29 +39,32 @@ for gfcl, RPID is (101-106)
 for testlab, RPID is SIPM
 
 ## execute bootstrap
-install `bootstrap2-rp.sh` in all red pitaya:
-```
-scp $DAMS/setup/gfpl/rp/bootstrap2-rp.sh root@rp_ip:/root/bootstrap2.sh
-```
-execute:
+
 ```
 cd $DAMS/setup/ && ./bootstrap.sh
 ```
 
-## start the acquisition
+## start the acquisition with rtadp DL0-DL2
 
-To start all clients:
+
+To start all clients and DL0-DL1-DL2 production:
+1. Check the rtadp configuration. `README.md, subsec. High level recontruction (DL0 -> DL1 -> DL2)`
+2. Check the gfcl.ini configuration contains "enable yes" in DL0DL2_PIPE section. 
+3. execute:
 ```
-$DAMS/setup/start.sh 
+$DAMS/setup/start.sh -r
 ```
-make sure all envvars are defined
-
-N.B. logs will be in `$DAMS/logs/dl0`
-
-
-To start just one client:
+further options described in helper
+1. To start all clients with multiprocessing capability:
 ```
-$DAMS/setup/start.sh --config $DAMS/setup/<deployment_name> -a <RPGNAME>
+$DAMS/setup/start.sh -m
+```
+N.B. rtadp basic logs will be in `$DAMS/logs/`
+
+
+To start just one client, attached to shell:
+```
+$DAMS/setup/start.sh -a -i <RPGNAME>
 ```
 
 
@@ -68,5 +77,5 @@ $DAMS/setup/stop_clients.sh
 
 To stop just one client specify the RPGNAME
 ```
-$DAMS/setup/stop_clients.sh -a <RPGNAME>
+$DAMS/setup/stop_clients.sh -i <RPGNAME>
 ```

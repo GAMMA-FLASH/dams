@@ -25,21 +25,44 @@ gammaflash-env
 
 ---
 
-## Docker image
+# Docker image
 
-* Build the image
-    ```
-    docker build -t dams_image:1.6.0 .
-    ```
+* Build the images using docker compose:
+```[bash]
+docker compose build
+```
+it will build base and prod image.
+`base` image hase no source code, it must be mounted from host
+`prod` image comes with source code and testlab setup installed. Note: check setup
 
 ----- entrypoint with jupyter start -----
-Starts jupyter in the entrypoint and defines in bashrc the envvars DAMS, RPG_CONFIG
+Starts jupyter in the entrypoint and defines in bashrc the envvars DAMS, RPG_CONFIG. 
 
-docker run -it -d \ 
-    -v /data02/:/data02/ -v /data01/:/data01/ -v /home/user/dams:/home/usergamma/dams \
-    --entrypoint /home/usergamma/dams/env/entrypoint.sh \ 
-    -e DAMS=/home/usergamma/dams -e RPG_CONFIG=/home/usergamma/dams/setup/<CHOOSE_SETUP_HERE> \
-    -p 8095:8888 --name gsky \
-    gammaflash:1.5.0_gammasky /bin/bash
+bootstrap docker image to allow docker to write on host:
+./bootstrap.sh dams_{image}:latest $USER
 
+mount all the archives you need to write data and logs:
+bond a port for opening jupyter notebook
+
+```[bash]
+docker run  -it -d \
+    -v /archive/.../DL0:/home/gamma/workspace/Data/DL0  \
+    -v /archive/.../DL1:/home/gamma/workspace/Data/DL1  \
+    -v /archive/.../DL2:/home/gamma/workspace/Data/DL2  \
+    -v /archive/.../logs:/home/gamma/workspace/Out/logs \
+    -v /archive/.../OutJson:/home/gamma/workspace/Out/json  \
+    -v /path/to/.../dams:/home/gamma/workspace/dams \  ###NOTE: do not mount with prod image
+    --entrypoint /home/gamma/workspace/dams/env/entrypoint.sh \
+    -e DAMS=/home/gamma/workspace/dams \
+    -e RPG_CONFIG=/home/gamma/workspace/dams/setup/testlab \
+    -p 8101:8888    \
+    --name dams_pipe_project \
+    dams_image:latest_$USER \
+    /bin/bash
+```
+
+to enter the container:
+```[bash]
+docker exec -it dams_pipe_project bash
+```
 -----------------------------------------

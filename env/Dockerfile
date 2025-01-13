@@ -1,4 +1,4 @@
-FROM oraclelinux:8 AS oracle8
+FROM oraclelinux:8 AS base
 
 # ---------------------------------- Installing dependencies as root ---------------------------------- 
 RUN dnf update
@@ -14,7 +14,7 @@ RUN dnf install -y hdf5 hdf5-devel
 
 # ---------------------------------- Create Gamma user ---------------------------------- 
 USER root 
-RUN useradd gamma
+RUN useradd gamma && chmod -R gamma:gamma /home/gamma
 USER gamma
 WORKDIR /home/gamma
 RUN mkdir -p /home/gamma/dependencies
@@ -86,3 +86,30 @@ ENV PYTHONPATH="${PYTHONPATH}:/home/gamma/workspace/dams/pipe"
 # ENTRYPOINT ["/bin/bash", "-c", "source /home/gamma/entrypoint.sh && exec bash"]
 # CMD ["/bin/bash", "-c", "source /home/gamma/entrypoint.sh && exec bash"]
 RUN echo "source /opt/conda/bin/activate gammaenv" >> /home/gamma/.bashrc
+
+
+FROM dams_image AS prod
+
+USER root 
+RUN chown -R gamma:gamma /home/gamma
+
+USER gamma
+
+ARG REPO_BRANCH=main
+ARG REPO_SRC=https://github.com/GAMMA-FLASH/dams.git
+
+ENV DAMS=/home/gamma/workspace/dams
+ENV RPG_CONFIG=/home/gamma/workspace/dams/setup/testlab
+
+RUN git clone --recurse-submodules --branch ${REPO_BRANCH} ${REPO_SRC} /home/gamma/workspace/dams && \
+    ln -s $DAMS/setup/testlab/host3/gfcl.ini.host3> $DAMS/dl0/gfcl.ini
+
+WORKDIR /home/gamma/workspace/dams
+
+RUN ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
+
+
+
+# ENTRYPOINT /home/gamma/entrypoint.sh
+
+

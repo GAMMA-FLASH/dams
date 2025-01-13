@@ -3,12 +3,7 @@
 # Funzione per mostrare l'uso dello script
 
 
-usage() {
-    log_message "Usage: $0 [--config <RPG_config_or_directory>] [[--background [RPGNAME|all]] or [--attached [RPGNAME]]] [--multiprocessing] [--rtadp]"
-    log_message "Usage: $0 [-c <RPG_config_or_directory>] [[-b [RPGNAME|all]] or [-a [RPGNAME]]] [-m] [-r]"
-    log_message "RPGNAME one of the ones defined in .cfg or 'all'"
-    exit 1
-}
+
 
 build_gfcl_command() {
     local addr="$1"
@@ -21,21 +16,35 @@ build_gfcl_command() {
 
 }
 
+source "$(dirname "$0")/common_utils.sh"
+
+usage() {
+    log_message "Usage: $0 [--config <RPG_config_or_directory>] [[--background] or [--attached]] --ip [RPGNAME]]  [RPGNAME]]] [--multiprocessing] [--rtadp]"
+    log_message "Usage: $0 [-c <RPG_config_or_directory>] [[-b] or [-a]] [-i <RPGNAME>] [-m] [-r]"
+    log_message "RPGNAME one of the ones defined in .cfg or 'all'"
+    log_message "Options:"
+    log_message "--config | -c                  overrides the config file 'RPGLIST.cfg' defined with 'RPG_CONFIG' envvar"
+    log_message "--background | -b              starts the client in background. insert one or mode --ip options to specify the clients to start"
+    log_message "--attached starts | -a         one client attached in foreground, it is mutually exclusive with background. To be combined with one --ip option"
+    log_message "--rtadp | -r                   starts DL1-DL2 processes."
+    log_message "--multiprocessing | -m         enables client multiprocessing."
+    exit 1
+}
+
 log_setup() {
     echo
     log_message "Background execution: ${BACKGROUND}"
-    log_message "Starting rpId: ${ATTACHED_NAME}"
+    log_message "Starting rpIds: ${ATTACHED_NAMES[*]:-all}"
     log_message "Client multiprocessing rtadp: ${RTADP_START}"
     log_message "Starting rtadp: ${RTADP_START}"
     echo
 }
 
-source "$(dirname "$0")/common_utils.sh"
 check_host_and_activate_python
 
 cli_argparser $@
 # Itera su ogni riga del file di configurazione
-check_client_to_start () {
+choose_and_start () {
     ### "$rp_name" "$addr" "$port" "$wformno"
     local rp_name=$1
     local addr=$2
@@ -45,26 +54,23 @@ check_client_to_start () {
     if [ -z "$FIRST_RPG_NAME" ]; then
         FIRST_RPG_NAME="$rp_name"
     fi
-    
     # Esecuzione del comando con i parametri letti
     if [ "$BACKGROUND" = true ]; then
-        if [ "$ATTACHED_NAME" = "$rp_name" ] || [ "$ATTACHED_NAME" = "all" ]; then
+        if [[ " ${ATTACHED_NAMES[*]} " =~ " ${rp_name} " ]] || [ ${#ATTACHED_NAMES[@]} -eq 0  ]; then
             command_string=$(build_gfcl_command $addr $port $rp_name $wformno)
             log_message "Client started with: \" $command_string\""
             nohup bash -c "$command_string" > "$DL0_LOGS/gfcl_RPG$rp_name.log" 2>&1 &
         fi
         
-    elif [ "$ATTACHED_NAME" = "$rp_name" ] || ( [ -z "$ATTACHED_NAME" ] && [ "$rp_name" = "$FIRST_RPG_NAME" ] ); then
+    elif [[ " ${ATTACHED_NAMES[0]} " =~ " ${rp_name} " ]] || ( [ ${#ATTACHED_NAMES[@]} -eq 0 ] && [ "$rp_name" = "$FIRST_RPG_NAME" ] ); then
         echo "Launched RPG: $rp_name"
         eval $(build_gfcl_command "$addr" "$port" "$rp_name" "$wformno")
-
-        log_error "do not passhere"
-        stop_rtadp 
+        if [ "$RTADP_START" == "true" ]; then 
+            stop_rtadp 
+        fi
         exit 0 # Esci dopo aver lanciato l'attached process
     fi
 }
-
-
 
 
 PIDS=gfcl.pids
@@ -121,4 +127,4 @@ start_rtadp
 else 
 log_message "start manually rtadp"
 fi
-process_file_with_function check_client_to_start
+process_file_with_function choose_and_start
