@@ -1,5 +1,5 @@
-# gammaflash-env
-gammaflash-env
+# gamma-env
+gamma-env
 
 ## Install and run the environment
 
@@ -28,21 +28,30 @@ gammaflash-env
 # Docker image
 
 * Build the images using docker compose:
+  
 ```[bash]
 docker compose build
 ```
+
 it will build base and prod image.
+
 `base` image hase no source code, it must be mounted from host
+
 `prod` image comes with source code and testlab setup installed. Note: check setup
 
------ entrypoint with jupyter start -----
-Starts jupyter in the entrypoint and defines in bashrc the envvars DAMS, RPG_CONFIG. 
+## entrypoint with Jupyter start
+
+Starts Jupyter in the entrypoint and defines in bashrc the envvars DAMS, RPG_CONFIG. 
 
 bootstrap docker image to allow docker to write on host:
+
+```[bash]
 ./bootstrap.sh dams_{image}:latest $USER
+```
 
 mount all the archives you need to write data and logs:
-bond a port for opening jupyter notebook
+
+bond a port for opening Jupyter notebook
 
 ```[bash]
 docker run  -it -d \
@@ -62,6 +71,7 @@ docker run  -it -d \
 ```
 
 to enter the container:
+
 ```[bash]
 docker exec -it dams_pipe_project bash
 ```
