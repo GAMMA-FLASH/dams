@@ -32,7 +32,7 @@ fi
 SCRIPT_DIR=$(dirname $0)
 
 UPDATE_SCRIPT="${SCRIPT_DIR}/gfpl/rp/update_rp.sh"
-OSC_CONFIG="${OSC_CONFIG:-(dirname $RPG_CONFIG)/CONFIG.xml}"
+OSC_CONFIG="${OSC_CONFIG:-$(dirname $RPG_CONFIG)/CONFIG.xml}"
 
 LOGS="$DAMS/logs/install_dam_rp"
 

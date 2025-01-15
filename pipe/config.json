@@ -30,7 +30,7 @@
             "name_workers": "worker"
         }
     ],
-	"logs_path": "/home/gamma/workspace/Data/Out/logs",
+	"logs_path": "/home/gamma/workspace/Out/logs",
     "logs_level": 3,
     "comment": "datasockettype=pushpull|pubsub|custum dataflowtype=binary|filename|string processingtype=process|thread"
   },
@@ -54,7 +54,7 @@
             "name_workers": "worker"
         }
     ],
-	"logs_path": "/home/gamma/workspace/Data/Out/logs",
+	"logs_path": "/home/gamma/workspace/Out/logs",
 	"logs_level": 3,
     "comment": "datasockettype=pushpull|pubsub|custum dataflowtype=binary|filename|string processingtype=process|thread"
   },
@@ -78,7 +78,7 @@
             "name_workers": "worker"
         }
     ],
-	"logs_path": "/home/gamma/workspace/Data/Out/logs",
+	"logs_path": "/home/gamma/workspace/Out/logs",
 	"logs_level": 3,
     "comment": "datasockettype=pushpull|pubsub|custum dataflowtype=binary|filename|string processingtype=process|thread"
   },
@@ -102,7 +102,7 @@
             "name_workers": "worker"
         }
     ],
-	"logs_path": "/home/gamma/workspace/Data/Out/logs",
+	"logs_path": "/home/gamma/workspace/Out/logs",
 	"logs_level": 3,
 	"comment": "datasockettype=pushpull|pubsub dataflowtype=binary|filename|string processingtype=process|thread logs_level=1|2|3"
   }

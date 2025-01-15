@@ -14,7 +14,7 @@ RUN dnf install -y hdf5 hdf5-devel
 
 # ---------------------------------- Create Gamma user ---------------------------------- 
 USER root 
-RUN useradd gamma && chmod -R gamma:gamma /home/gamma
+RUN useradd gamma && chown -R gamma:gamma /home/gamma
 USER gamma
 WORKDIR /home/gamma
 RUN mkdir -p /home/gamma/dependencies

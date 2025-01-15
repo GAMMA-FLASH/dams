@@ -27,52 +27,114 @@ gamma-env
 
 # Docker image
 
-* Build the images using docker compose:
-  
-```[bash]
-docker compose build
-```
-
+Build the images using docker compose:
 it will build base and prod image.
-
-`base` image hase no source code, it must be mounted from host
-
-`prod` image comes with source code and testlab setup installed. Note: check setup
-
-## entrypoint with Jupyter start
-
-Starts Jupyter in the entrypoint and defines in bashrc the envvars DAMS, RPG_CONFIG. 
-
-bootstrap docker image to allow docker to write on host:
-
+* `base` image hase no source code, it must be mounted from host
+    ```[bash]
+    docker compose build base
+    ```
+* `prod` image comes with source code and testlab setup installed.  
+    Note: check dams setup  
+    Note: `latest` image has source code from `main` branch
+    ```[bash]
+    docker compose build prod
+    ```
+    to build installing a specified **branch**, or **tagged** dams version:
+    ```[bash]
+    REPO_BRANCH=<branch> docker compose build prod
+    ```
+**example**: to build all images; prod with the current host working branch:
 ```[bash]
-./bootstrap.sh dams_{image}:latest $USER
+REPO_BRANCH=$(git rev-parse --abbrev-ref HEAD) docker compose build
 ```
 
-mount all the archives you need to write data and logs:
+## Start development environment using base image:
+----- entrypoint with jupyter start -----
 
-bond a port for opening Jupyter notebook
+Starts jupyter in the entrypoint and defines in bashrc the envvars DAMS, RPG_CONFIG. 
 
-```[bash]
-docker run  -it -d \
-    -v /archive/.../DL0:/home/gamma/workspace/Data/DL0  \
-    -v /archive/.../DL1:/home/gamma/workspace/Data/DL1  \
-    -v /archive/.../DL2:/home/gamma/workspace/Data/DL2  \
-    -v /archive/.../logs:/home/gamma/workspace/Out/logs \
-    -v /archive/.../OutJson:/home/gamma/workspace/Out/json  \
-    -v /path/to/.../dams:/home/gamma/workspace/dams \  ###NOTE: do not mount with prod image
-    --entrypoint /home/gamma/workspace/dams/env/entrypoint.sh \
-    -e DAMS=/home/gamma/workspace/dams \
-    -e RPG_CONFIG=/home/gamma/workspace/dams/setup/testlab \
-    -p 8101:8888    \
-    --name dams_pipe_project \
-    dams_image:latest_$USER \
-    /bin/bash
-```
+1.  bootstrap docker image to allow docker to write on host:
+    ./bootstrap.sh dams_{image}:latest $USER
 
-to enter the container:
+2.  mount all the archives you need to write data and logs:
+    bond a port for opening jupyter notebook
 
-```[bash]
-docker exec -it dams_pipe_project bash
-```
+    ```[bash]
+    docker run  -it -d \
+        -v /archive/.../DL0:/home/gamma/workspace/Data/DL0  \
+        -v /archive/.../DL1:/home/gamma/workspace/Data/DL1  \
+        -v /archive/.../DL2:/home/gamma/workspace/Data/DL2  \
+        -v /archive/.../logs:/home/gamma/workspace/Out/logs \
+        -v /archive/.../OutJson:/home/gamma/workspace/Out/json  \
+        -v /path/to/.../dams:/home/gamma/workspace/dams \
+        --entrypoint /home/gamma/workspace/dams/env/entrypoint.sh \
+        -e DAMS=/home/gamma/workspace/dams \
+        -e RPG_CONFIG=/home/gamma/workspace/dams/setup/testlab \
+        -p 8101:8888    \
+        --name dams_pipe_project \
+        dams_image:latest_$USER \
+        /bin/bash
+    ```
+
+3.  to enter the container:
+    ```[bash]
+    docker exec -it dams_pipe_project bash
+    ```
 -----------------------------------------
+
+## Start production environment using prod image:
+
+----- entrypoint with jupyter start -----
+
+Starts jupyter in the entrypoint and defines in bashrc the envvars DAMS, RPG_CONFIG. 
+
+1.  bootstrap docker image to allow docker to write on host:
+    ```[bash]
+    ./bootstrap.sh dams_{image}:latest $USER
+    ```
+
+2.  mount all the archives you need to write data and logs:
+    bond a port for opening jupyter notebook
+
+    ```[bash]
+    docker run  -it -d \
+        -v /archive/.../DL0:/home/gamma/workspace/Data/DL0  \
+        -v /archive/.../DL1:/home/gamma/workspace/Data/DL1  \
+        -v /archive/.../DL2:/home/gamma/workspace/Data/DL2  \
+        -v /archive/.../logs:/home/gamma/workspace/Out/logs \
+        -v /archive/.../OutJson:/home/gamma/workspace/Out/json  \
+        --entrypoint /home/gamma/workspace/dams/env/entrypoint.sh \
+        -e DAMS=/home/gamma/workspace/dams \
+        -e RPG_CONFIG=/home/gamma/workspace/dams/setup/testlab \
+        -e OSC_CONFIG=/home/gamma/workspace/dams/setup/testlab/CONFIG.xml \
+        -p 8101:8888    \
+        --name dams_pipe_project \
+        dams_image:<dams_branch_or_latest>_$USER \
+        /bin/bash
+    ```
+
+3.  to enter the container:
+    ```[bash]
+    docker exec -it dams_pipe_project bash
+    ```
+
+-----------------------------------------
+
+## Example - host3
+
+```[bash]
+    docker run  -it -d \
+        -v /archive/GAMMASKY/DL0:/home/gamma/workspace/Data/DL0  \
+        -v /archive/GAMMASKY/DL1:/home/gamma/workspace/Data/DL1  \
+        -v /archive/GAMMASKY/DL2:/home/gamma/workspace/Data/DL2  \
+        -v /archive/GAMMASKY/logs:/home/gamma/workspace/Out/logs \
+        -v /archive/GAMMASKY/OutJson:/home/gamma/workspace/Out/json  \
+        --entrypoint /home/gamma/workspace/dams/env/entrypoint.sh \
+        -e DAMS=/home/gamma/workspace/dams \
+        -e RPG_CONFIG=/home/gamma/workspace/dams/setup/testlab \
+        -e OSC_CONFIG=/home/gamma/workspace/dams/setup/testlab/CONFIG.xml \
+        -p 8101:8888    \
+        --name dams_pipe_project \
+        dams_image:<dams_branch_or_latest>_$USER \
+        /bin/bash
+    ```
