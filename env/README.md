@@ -41,11 +41,11 @@ it will build base and prod image.
     ```
     to build installing a specified **branch**, or **tagged** dams version:
     ```[bash]
-    REPO_BRANCH=<branch> docker compose build prod
+    REPO_BRANCH=<branch> CACHE_BUSTER=$(date +%s) docker compose build prod
     ```
 **example**: to build all images; prod with the current host working branch:
 ```[bash]
-REPO_BRANCH=$(git rev-parse --abbrev-ref HEAD) docker compose build
+REPO_BRANCH=$(git rev-parse --abbrev-ref HEAD) CACHE_BUSTER=$(date +%s) docker compose build
 ```
 
 ## Start development environment using base image:

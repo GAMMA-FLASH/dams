@@ -21,6 +21,7 @@ services:
       target: prod
       args:
         - REPO_BRANCH=${REPO_BRANCH:-main}
+        - CACHE_BUSTER=${CACHE_BUSTER:-1} # Puoi usare una variabile d'ambiente o un valore predefinito
         # - REPO_SRC= use it to change repo
     depends_on:
       - base
