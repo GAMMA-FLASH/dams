@@ -4,7 +4,7 @@ Test = no
 [INFLUXDB]
 Enable_Counts = no
 Enable_Hk = yes
-URL = 172.17.0.3:8086
+URL = 172.17.0.1:7804
 Token = LAEwTJwgWsPuv4YP00KRcw9iRhis3vzK8agBjn0OhZqqpmxEFjT7RlWCcHszqG7m_8gCnTNasxqlzE1WUm-Wgg==
 Org = GAMMA-SKY
 Bucket = RP-COUNTS

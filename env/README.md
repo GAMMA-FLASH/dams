@@ -72,7 +72,7 @@ Starts jupyter in the entrypoint and defines in bashrc the envvars DAMS, RPG_CON
         -e RPG_CONFIG=/home/gamma/workspace/dams/setup/testlab \
         -p 8101:8888    \
         --name dams_pipe_project \
-        dams_image:latest_$USER \
+        dams_base:latest_$USER \
         /bin/bash
     ```
 
@@ -109,7 +109,7 @@ Starts jupyter in the entrypoint and defines in bashrc the envvars DAMS, RPG_CON
         -e OSC_CONFIG=/home/gamma/workspace/dams/setup/testlab/CONFIG.xml \
         -p 8101:8888    \
         --name dams_pipe_project \
-        dams_image:<dams_branch_or_latest>_$USER \
+        dams_prod:<dams_branch_or_latest>_$USER \
         /bin/bash
     ```
 
@@ -120,21 +120,32 @@ Starts jupyter in the entrypoint and defines in bashrc the envvars DAMS, RPG_CON
 
 -----------------------------------------
 
-## Example - host3
+## Example gammasky - host3 - testlab deploy
+
+bootstrap docker image to allow docker to write on host:
+    ```[bash]
+    ./bootstrap.sh dams_{image}:latest $USER
+    ```
+
+Assume to have on host3 a proper gfcl.ini file. You can find it in 
+`dams/setup/testlab/gfcl.ini.host3`. in the next command it is mounted
+execute from DAMS root:
 
 ```[bash]
+    cd /path/to/dams/root
     docker run  -it -d \
         -v /archive/GAMMASKY/DL0:/home/gamma/workspace/Data/DL0  \
         -v /archive/GAMMASKY/DL1:/home/gamma/workspace/Data/DL1  \
         -v /archive/GAMMASKY/DL2:/home/gamma/workspace/Data/DL2  \
         -v /archive/GAMMASKY/logs:/home/gamma/workspace/Out/logs \
         -v /archive/GAMMASKY/OutJson:/home/gamma/workspace/Out/json  \
+        -v ./setup/testlab/host3/gfcl.ini.host3:/home/gamma/workspace/dams/dl0/gfcl.ini  \
         --entrypoint /home/gamma/workspace/dams/env/entrypoint.sh \
         -e DAMS=/home/gamma/workspace/dams \
         -e RPG_CONFIG=/home/gamma/workspace/dams/setup/testlab \
         -e OSC_CONFIG=/home/gamma/workspace/dams/setup/testlab/CONFIG.xml \
         -p 8101:8888    \
-        --name dams_pipe_project \
-        dams_image:<dams_branch_or_latest>_$USER \
+        --name dams_pipe_project --rm \
+        dams_prod:<dams_branch_or_latest>_$USER \
         /bin/bash
     ```
