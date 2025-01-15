@@ -131,6 +131,11 @@ Assume to have on host3 a proper gfcl.ini file. You can find it in
 `dams/setup/testlab/gfcl.ini.host3`. in the next command it is mounted
 execute from DAMS root:
 
+create a docker volume to store ssh secrets:
+```[bash]
+docker volume create dams_pipe_project_ssh_storage
+```
+
 ```[bash]
     cd /path/to/dams/root
     docker run  -it -d \
@@ -140,12 +145,13 @@ execute from DAMS root:
         -v /archive/GAMMASKY/logs:/home/gamma/workspace/Out/logs \
         -v /archive/GAMMASKY/OutJson:/home/gamma/workspace/Out/json  \
         -v ./setup/testlab/host3/gfcl.ini.host3:/home/gamma/workspace/dams/dl0/gfcl.ini  \
+        -v dams_pipe_project_ssh_storage:/home/gamma/.ssh  \
         --entrypoint /home/gamma/workspace/dams/env/entrypoint.sh \
         -e DAMS=/home/gamma/workspace/dams \
         -e RPG_CONFIG=/home/gamma/workspace/dams/setup/testlab \
         -e OSC_CONFIG=/home/gamma/workspace/dams/setup/testlab/CONFIG.xml \
         -p 8101:8888    \
-        --name dams_pipe_project --rm \
+        --name dams_pipe_project \
         dams_prod:<dams_branch_or_latest>_$USER \
         /bin/bash
     ```
