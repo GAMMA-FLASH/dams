@@ -46,6 +46,10 @@ it will build base and prod image.
 **example**: to build all images; prod with the current host working branch:
 ```[bash]
 REPO_BRANCH=$(git rev-parse --abbrev-ref HEAD) CACHE_BUSTER=$(date +%s) docker compose build
+
+e.g.
+
+REPO_BRANCH=dev_kernel2 docker compose build  --no-cache
 ```
 
 ## Start development environment using base image:
