@@ -188,7 +188,7 @@ class Save(BaseWorker):
             super().__init__()
             self.pid if use_multiprocessing else threading.get_ident()
             self.queue = queue
-            self.rpid_subfolder = f"{rpid}/35mv"
+            self.rpid_subfolder = f"RPG{rpid}/35mv"
             self.outdir = f"{outdir}/{self.rpid_subfolder}"
             self.dl2_dir = self.outdir.replace("DL0","DL2")
             self.wformno = wformno
