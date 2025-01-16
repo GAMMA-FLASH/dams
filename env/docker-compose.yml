@@ -1,18 +1,10 @@
-###
-# build dockerfile multistage. to build base, sde and prod image exec:
-# $> docker compose build
-# to install a specific repo or branch on prod image :
-# $> REPO_SRC="https://repo.git" REPO_BRANCH="dev_branch" docker compose build
-###
-
 services:
-
   base:
     build:
       context: .
       dockerfile: Dockerfile
       target: base
-    image: dams_base:1.6.0
+    image: dams_base:${BASE_TAG:-1.6.0} # Usa BASE_TAG per configurare il tag
 
   prod:
     build:
@@ -20,9 +12,9 @@ services:
       dockerfile: Dockerfile
       target: prod
       args:
-        - REPO_BRANCH=${REPO_BRANCH:-main}
-        - CACHE_BUSTER=${CACHE_BUSTER:-1} # Puoi usare una variabile d'ambiente o un valore predefinito
-        # - REPO_SRC= use it to change repo
+        - BASE_IMAGE=dams_base:${BASE_TAG:-1.6.0}
+        - REPO_BRANCH=${REPO_BRANCH:-dev_kernel2}
+        - CACHE_BUSTER=${CACHE_BUSTER:-1}
     depends_on:
       - base
     image: dams_prod:${REPO_BRANCH:-latest}
