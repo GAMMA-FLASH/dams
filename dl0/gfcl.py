@@ -184,11 +184,12 @@ class Recv(BaseWorker):
 
 class Save(BaseWorker):
 
-        def __init__(self, queue, outdir, wformno, spectrum_cfg, dl0dl2_pipeline):
+        def __init__(self, queue, outdir, wformno, spectrum_cfg, rpid, dl0dl2_pipeline):
             super().__init__()
             self.pid if use_multiprocessing else threading.get_ident()
             self.queue = queue
-            self.outdir = outdir
+            self.rpid_subfolder = f"{rpid}/35mv"
+            self.outdir = f"{outdir}/{self.rpid_subfolder}"
             self.dl2_dir = self.outdir.replace("DL0","DL2")
             self.wformno = wformno
             self.event_list: List[Event] = []
@@ -262,7 +263,7 @@ class Save(BaseWorker):
                 
                 from ConfigurationManager import ConfigurationManager
                 self.context = zmq.Context()
-                cfgman= ConfigurationManager(dl0dl2_pipeline['json_data'])
+                cfgman= ConfigurationManager(self.dl0dl2_pipeline['json_data'])
                 socketto_san=cfgman.get_configuration("DL0toDL1")["data_lp_socket"]
                 print("----------->", socketto_san)
                 self.socket_rtadp=self.context.socket(zmq.PUSH)
@@ -271,14 +272,14 @@ class Save(BaseWorker):
                     print("SAVE- Connected to : ", self.socket_rtadp)
                     print("SAVE- RTADP enabled")
                 except Exception as e:
-                    dl0dl2_pipeline['Enable'] = False
+                    self.dl0dl2_pipeline['Enable'] = False
                     print(f"ERROR: cannot connect to rtadp. Reason: {e}")
             
             else: 
                 self.socket_rtadp=None
 
         def _close_rtadp_connection(self):
-            if dl0dl2_pipeline['Enable']:
+            if self.dl0dl2_pipeline['Enable']:
                 self.socket_rtadp.setsockopt(zmq.LINGER, 0)  # Imposta la chiusura immediata
                 self.socket_rtadp.close()
                 self.context.destroy()
@@ -332,6 +333,7 @@ class Save(BaseWorker):
                         else: 
                             time_ms = math.trunc(time.time() * 1000) 
                         rpid = packet.rpID
+                        rpgid_folder_name = "RPG%1d" % rpid
                         print(f"INFO -- {rpid}")
                         if self._point is None:
                             self._point = Point("RPG%1d" % rpid).field("count", 1).time(time_ms, WritePrecision.MS)
@@ -410,9 +412,9 @@ class Save(BaseWorker):
             # ]
             # spectrum_cmd = " && ".join(cmd)
             # print("DEBUG - process command: ", spectrum_cmd)
-            data = {"path_dl0_folder": os.path.dirname(inputfile), 
-                    "path_dl1_folder": dl0dl2_pipeline['dl1_dir'], 
-                    "path_dl2_folder": dl0dl2_pipeline['dl2_dir'], 
+            data = {"path_dl0_folder": self.outdir, 
+                    "path_dl1_folder": self.dl0dl2_pipeline['dl1_dir']+f"/{self.rpid_subfolder}", 
+                    "path_dl2_folder": self.dl0dl2_pipeline['dl2_dir']+f"/{self.rpid_subfolder}", 
                     "filename":        os.path.basename(inputfile)}
             # Dump message
             message = json.dumps(data)
@@ -625,7 +627,7 @@ if __name__ == '__main__':
 
     signal.signal(signal.SIGINT, signal_handler)
 
-    save_thread : Union[Process, Thread] = Dyn_Save(queue, args.outdir, args.wformno, spectrum_cfg, dl0dl2_pipeline)
+    save_thread : Union[Process, Thread] = Dyn_Save(queue, args.outdir, args.wformno, spectrum_cfg, args.rpid, dl0dl2_pipeline)
     save_thread.start()
 
     sleep(1)

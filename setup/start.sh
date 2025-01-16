@@ -12,7 +12,7 @@ build_gfcl_command() {
     local wformno="$4"
 
     # Costruisci e ritorna la stringa del comando
-    echo "$PYTHON $GFCL --rpid \"$rp_name\" --addr \"$addr\" --port \"$port\" --outdir \"$DL0DIR/RPG$rp_name/35mV/\" --wformno \"$wformno\" $MULTIPROCESSING"
+    echo "$PYTHON $GFCL --rpid \"$rp_name\" --addr \"$addr\" --port \"$port\" --outdir \"$DL0DIR\" --wformno \"$wformno\" $MULTIPROCESSING"
 
 }
 
