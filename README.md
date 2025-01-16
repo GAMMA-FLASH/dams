@@ -17,15 +17,21 @@ Prerequisites:
 0. continue reading having a configured docker instance. check `env/Readme.md`
 
 ## Server-client (Oscilloscope -> DL0)
-1. Define `DAMS` variable in the client machine, pointing to the ROOT of the https://github.com/GAMMA-FLASH/dams repository.
-2. Define `DL0DIR` variable pointing to the output directory to store DL0 data. Note: Helper is provided
-3. Define `$RPG_CONFIG` variable as the path to the deployment configuration folder.
+1. Define `DAMS` variable in the client machine, pointing to the ROOT of the https://github.com/GAMMA-FLASH/dams repository. **NOTE: DAMS can be defined during docker run**.
+2. Define `DL0DIR` variable pointing to the output directory to store DL0 data. **Note: Helper is provided**. 
+3. Define `$RPG_CONFIG` variable as the path to the deployment configuration folder. **NOTE: it can be defined during docker run**
 4. Create a symbolic link "gfcl.ini" for the client configuration:
 ```
 ln -s </path/to/gfcl.machine.ini> $DAMS/dl0/gfcl.ini
 ```
-
+  **NOTE: it is conventient to mount the .ini host configuration as a volume when using prod image**:
+```[bash]
+docker run [...]
+-v /path/to/gfcl.ini.host:/home/gamma/workspace/dams/dl0/gfcl.ini
+dams_prod
+```
 `$DAMS/setup` folder contains already available deployments, such ad GAMMAFLASH plane payload (gfpl) and a test configuration for GAMMASKY (testlab).
+
 
 ### How to create a new deployment:
 1. Create the path to `$RPG_CONFIG`. add a copy of dams/dam/CONFIG.xml to change the Oscilloscope configuration, and create a RPGLIST.cfg file
@@ -86,11 +92,11 @@ ssh root@ip
 ```
 3. from main pc, deploy DAMS source code using the utility:
 ```
-$DAMS/setup/rp/deploy_rp.sh --version <branch_or_tag_name>
+$DAMS/setup/deploy_rp.sh --version <branch_or_tag_name>
 ```
 specific rps from the configured RPGLIST.cfg:
 ```
-$DAMS/setup/rp/deploy_rp.sh --ip 101 --ip 102 --version <branch_or_tag_name>
+$DAMS/setup/deploy_rp.sh --ip 101 --ip 102 --version <branch_or_tag_name>
 ```
 
 # Run
@@ -99,11 +105,13 @@ Refer to `setup/README.md` file
 
 
 ## Jupiter
-nohup jupyter-lab --ip="*" --port 8001 --no-browser --autoreload --NotebookApp.token='gf2023#'  --notebook-dir=/home/gamma/workspace --allow-root > jupyterlab_start.log 2>&1 &
+Jupyter server is started automatically via entrypoint in prod image.
+check entrypoint selection and repository mount when using base image.
 
+Entrypoint : `dams/env/entripoint.sh`
 
 ## Vscode config 
-Copy this config inside `.vscode/` folder to exploit autocompletion:
+Copy this config inside `.vscode/` folder to exploit pylance autocompletion:
 
 ```
 {
