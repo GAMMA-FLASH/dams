@@ -106,9 +106,7 @@ Starts jupyter in the entrypoint and defines in bashrc the envvars DAMS, RPG_CON
         -v /archive/.../DL1:/home/gamma/workspace/Data/DL1  \
         -v /archive/.../DL2:/home/gamma/workspace/Data/DL2  \
         -v /archive/.../logs:/home/gamma/workspace/Out/logs \
-        -v /archive/.../OutJson:/home/gamma/workspace/Out/json  \
-        --entrypoint /home/gamma/workspace/dams/env/entrypoint.sh \
-        -e DAMS=/home/gamma/workspace/dams \
+        -v /archive/.../OutJson:/home/gamma/workspace/Out/json  \        
         -e RPG_CONFIG=/home/gamma/workspace/dams/setup/testlab \
         -e OSC_CONFIG=/home/gamma/workspace/dams/setup/testlab/CONFIG.xml \
         -p 8101:8888    \
@@ -150,8 +148,6 @@ docker volume create dams_pipe_project_ssh_storage
         -v /archive/GAMMASKY/OutJson:/home/gamma/workspace/Out/json  \
         -v ./setup/testlab/host3/gfcl.ini.host3:/home/gamma/workspace/dams/dl0/gfcl.ini  \
         -v dams_pipe_project_ssh_storage:/home/gamma/.ssh  \
-        --entrypoint /home/gamma/workspace/dams/env/entrypoint.sh \
-        -e DAMS=/home/gamma/workspace/dams \
         -e RPG_CONFIG=/home/gamma/workspace/dams/setup/testlab \
         -e OSC_CONFIG=/home/gamma/workspace/dams/setup/testlab/CONFIG.xml \
         -p 8101:8888    \

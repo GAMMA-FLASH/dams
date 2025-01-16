@@ -105,9 +105,8 @@ RUN git clone --recurse-submodules --branch ${REPO_BRANCH} ${REPO_SRC} /home/gam
 
 WORKDIR /home/gamma/workspace/dams
 
+RUN mkdir /home/gamma/.ssh && chmod 700 /home/gamma/.ssh
 
-
-
-# ENTRYPOINT /home/gamma/entrypoint.sh
+ENTRYPOINT /home/gamma/workspace/dams/env/entrypoint.sh
 
 
