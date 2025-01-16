@@ -16,9 +16,9 @@ Timestamp_Hk = RP
 [SPECTRUM_AN]
 Enable = no
 Venv = gammaflash
-ProcessName = /home/usergamma/workspace/dams/dl2/eventlist_v4.py
+ProcessName = /home/gamma/workspace/dams/dl2/eventlist_v4.py
 ProcessArgs =  
-ProcessOut = /home/usergamma/logs
+ProcessOut = /home/gamma/logs
 
 [DL0DL2_PIPE]
 Enable = yes

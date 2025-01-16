@@ -14,11 +14,11 @@ export DATA02="/data02/"
 echo Data01 is $DATA01
 echo Data02 is $DATA02
 docker run -it -d \
-    -v $DATA01:/home/usergamma/workspace \
-    -v $DATA01:/home/usergamma/workspace \
+    -v $DATA01:/home/gamma/workspace \
+    -v $DATA01:/home/gamma/workspace \
     -v $DATA02:/data02/ \
-    -v /home/gammasky/dams:/home/usergamma/workspace/dams \
-    -e DAMS=/home/usergamma/workspace/dams  \
+    -v /home/gammasky/dams:/home/gamma/workspace/dams \
+    -e DAMS=/home/gamma/workspace/dams  \
     -p 7805:8888 \
     --name $GF_NAME \
     gammaflash:1.5.0_${USER} \

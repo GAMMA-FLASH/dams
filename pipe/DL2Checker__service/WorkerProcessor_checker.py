@@ -8,7 +8,7 @@ from printcolors import *
 class WorkerDL2CCK(WorkerBase):
 	def __init__(self):
 		super().__init__()
-		self.json_path = '/home/usergamma/workspace/test/Out'
+		self.json_path = '/home/gamma/workspace/test/Out'
 
 	def check_sameDL2(self, filePath_dl0_dl2, filePath_dl1_dl2):
 		# Initialize check variables  

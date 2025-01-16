@@ -99,7 +99,7 @@ Refer to `setup/README.md` file
 
 
 ## Jupiter
-nohup jupyter-lab --ip="*" --port 8001 --no-browser --autoreload --NotebookApp.token='gf2023#'  --notebook-dir=/home/usergamma/workspace --allow-root > jupyterlab_start.log 2>&1 &
+nohup jupyter-lab --ip="*" --port 8001 --no-browser --autoreload --NotebookApp.token='gf2023#'  --notebook-dir=/home/gamma/workspace --allow-root > jupyterlab_start.log 2>&1 &
 
 
 ## Vscode config 

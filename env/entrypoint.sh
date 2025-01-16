@@ -13,12 +13,12 @@ source activate $condaenviron
 
 
 
-TOKEN="gf2023#"
+TOKEN="${TOKEN:-gf2023#}"
 
 
 echo "starting notebook. Use Token: $TOKEN"
 # Avviare il notebook Jupyter, legandolo a tutte le interfacce di rete e mettendo i log su stdout
-nohup jupyter-lab --ip="*" --no-browser --autoreload --NotebookApp.token="$TOKEN" --notebook-dir=/home/usergamma/dams --allow-root > /dev/stdout 2>&1 &
+jupyter-lab --ip="*" --no-browser --autoreload --NotebookApp.token="$TOKEN" --notebook-dir=/home/gamma/workspace/dams --allow-root > /dev/stdout 2>&1 &
 
 # Verifica se le variabili sono già presenti
 if ! grep -q "export DAMS=" ~/.bashrc; then
