@@ -6,6 +6,7 @@ import os
 class Supervisor_DL0toDL2(Supervisor):
 	def __init__(self, config_file="config.json", name="DL0toDL2"):
 		super().__init__(config_file, name)
+		self.start()
 
 	def start_managers(self):
 		manager_GF02 = WorkerManager_DL0toDL2(0, self, "dl0dl2_wm")
