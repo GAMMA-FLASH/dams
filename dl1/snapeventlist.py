@@ -4,6 +4,7 @@ from tqdm import tqdm
 import json
 import xml.etree.ElementTree as ET
 import h5py
+import tables as tb
 from h5py import Dataset
 import numpy as np
 
@@ -127,6 +128,78 @@ class EventlistSnapshot():
                                    wfdl0name, 
                                    i)
         self.__dl1Write(dl1_path)
+
+
+    def generate_simulated_dl1(
+            self, 
+            waveforms: np.ndarray, 
+            tstarts: np.ndarray, 
+            dl_path: str, 
+            pbar_show: bool = False):
+        """
+        Genera un file DL1 simulato a partire da una matrice numpy di waveforms.
+
+        Parameters:
+            waveforms (np.ndarray): Array numpy di dimensioni (N, M), dove N è il numero di waveforms e M la lunghezza di ciascuna.
+            tstarts (np.ndarray): Array numpy di dimensioni (N,) contenente i valori di tstart associati a ogni waveform.
+            dl_path (str): Percorso completo del file DL1 da generare.
+            pbar_show (bool): Se True, mostra la barra di progresso.
+        """
+        if waveforms.ndim != 2:
+            raise ValueError("L'array waveforms deve essere bidimensionale (N, M).")
+
+        num_waveforms, waveform_length = waveforms.shape
+        if waveform_length != self.xlen:
+            raise ValueError(f"La lunghezza di ogni waveform ({waveform_length}) deve essere uguale a xlen ({self.xlen}).")
+
+        block_size = 500  # Dimensione del blocco di dati da scrivere
+
+        # Scrittura a blocchi
+        for i in tqdm(range(0, num_waveforms, block_size), desc="Writing blocks", disable=not pbar_show):
+            with tb.open_file(dl_path.replace('dl1.h5', 'dl0.h5'), mode='a') as f:
+                # Creazione del gruppo 'waveforms' se non esiste
+                if '/waveforms' not in f.root:
+                    wfs_group = f.create_group('/', 'waveforms', title="Group for waveforms")
+                else:
+                    wfs_group = f.root.waveforms
+
+                # Loop sugli eventi del blocco corrente
+                for j in range(i, min(i + block_size, num_waveforms)):
+                    # Espandi la waveform corrente per avere una dimensione 3D
+                    wfdl0 = waveforms[j, :, np.newaxis]
+
+                    # Salva la waveform come CArray
+                    carray_new = f.create_carray(
+                        wfs_group, f'wf_{j:06d}', tb.Int16Atom(), 
+                        wfdl0.shape, f'wf_{j:06d}',
+                        filters=tb.Filters(complevel=5, complib='zlib'),
+                        obj=wfdl0
+                    )
+
+                    # Attributi associati alla waveform
+                    carray_new._v_attrs.CurrentOffset = 9654
+                    carray_new._v_attrs.TriggerOffset = 9654 + tstarts[j] + 1
+                    carray_new._v_attrs.TimeSts = 0
+                    carray_new._v_attrs.Year = 0
+                    carray_new._v_attrs.Month = 0
+                    carray_new._v_attrs.Day = 0
+                    carray_new._v_attrs.HH = 0
+                    carray_new._v_attrs.mm = 0
+                    carray_new._v_attrs.ss = 0
+                    carray_new._v_attrs.usec = 0
+                    carray_new._v_attrs.tstart = tstarts[j]
+                    carray_new._v_attrs.Dec = 1
+                    carray_new._v_attrs.Eql = 1
+                    carray_new._v_attrs.TITLE = f"wf_{j}"
+                    carray_new._v_attrs.VERSION = "2.0"
+                    carray_new._v_attrs.configID = 0
+                    carray_new._v_attrs.rp_id = 0
+                    carray_new._v_attrs.sessionID = 162
+                    carray_new._v_attrs.runid = 0
+                    carray_new._v_attrs.PPSSliceNO = 0
+                    carray_new._v_attrs.SampleNo = waveform_length
+
+        print(f"File DL0 simulato creato con successo in: {dl_path}")
 
 
     def delete_empty_file(self, nome_file):
