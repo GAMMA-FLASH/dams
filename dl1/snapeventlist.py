@@ -106,7 +106,7 @@ class EventlistSnapshot():
         print("Processing " + filename)
         self.create_directory(outdir)
         basename = Path(outdir, os.path.basename(filename))
-        outputfilename = f"{Path(basename).with_suffix('.dl2.h5')}"
+        outputfilename = f"{Path(basename).with_suffix('.dl1.h5')}"
         # Check if file exists and is not empty
         self.delete_empty_file(outputfilename)
         if os.path.exists(outputfilename):

@@ -666,7 +666,7 @@ class EventlistDL1(EventlistGeneral):
                             # Since sliding windows have stride 1, mean_block indices are 0:(len(arr)-block_size)
                             # So to index arr_calc you can use rowsL[0] directly
                             arrSignal    = arrcalc[:rowsL[0]].copy()
-                            arrSignal_tt = arrcalc_tt[:rowsHalf[0]].copy()
+                            arrSignal_tt = arrcalc_tt[:rowsL[0]].copy()
                         else:
                             arrSignal    = arrcalc.copy()
                             arrSignal_tt = arrcalc_tt.copy()
@@ -771,45 +771,47 @@ class EventlistDL1(EventlistGeneral):
                         "integral1": integral, 
                         "integral2": integralMM, 
                         "integral3": integralExp,
+                        "halflife": rowsHalf[0],
                         "temp": temp
                     })
                     j = j + 1
                     arrSignal_tt_list.append(arrSignal_tt.copy())
             
-            integrals_1 = np.array([dc['integral1'] for dc in res_dict])
-            integrals_2 = np.array([dc['integral2'] for dc in res_dict])
+                integrals_1 = np.array([dc['integral1'] for dc in res_dict])
+                integrals_2 = np.array([dc['integral2'] for dc in res_dict])
+                arrSignal_tt_list.append(np.array([]))
 
-            for i_rd, _ in enumerate(res_dict):
-                # If it is a pileup case
-                if np.isin(arrSignal_tt_list[i_rd+1], 
-                           arrSignal_tt_list[i_rd]).all():
-                    integral1_i_rd = integrals_1[i_rd] - np.sum(integrals_1[i_rd+1:])
-                    integral2_i_rd = integrals_2[i_rd] - np.sum(integrals_2[i_rd+1:])
-                else:
-                    integral1_i_rd = integrals_1[i_rd]
-                    integral2_i_rd = integrals_2[i_rd]
-                    
-                # N_Waveform	mult	tstart	index_peak	peak	integral1	integral2	integral3	halflife	temp
-                f.write(f"{res_dict[i_rd]['original_wf']}"
-                        f"\t{res_dict[i_rd]['pk_idx']}"
-                        f"\t{res_dict[i_rd]['current_tstart']}"
-                        f"\t{res_dict[i_rd]['peaks']}"
-                        f"\t{res_dict[i_rd]['vpeack']}"
-                        f"\t{integral1_i_rd}"
-                        f"\t{integral2_i_rd}"
-                        f"\t{res_dict[i_rd]['integral3']}"
-                        f"\t{res_dict[i_rd]['halflife']}"
-                        f"\t{res_dict[i_rd]['temp']:.2f}\n")
-                dl2_data.append([res_dict[i_rd]['original_wf'], 
-                                res_dict[i_rd]['pk_idx'], 
-                                res_dict[i_rd]['current_tstart'], 
-                                res_dict[i_rd]['peaks'], 
-                                res_dict[i_rd]['vpeack'], 
-                                integral1_i_rd, 
-                                integral2_i_rd, 
-                                res_dict[i_rd]['integral3'], 
-                                res_dict[i_rd]['halflife'], 
-                                res_dict[i_rd]['temp']])
+                for i_rd, _ in enumerate(res_dict):
+                    # If it is a pileup case
+                    if np.isin(arrSignal_tt_list[i_rd+1], 
+                            arrSignal_tt_list[i_rd]).all():
+                        integral1_i_rd = integrals_1[i_rd] - np.sum(integrals_1[i_rd+1:])
+                        integral2_i_rd = integrals_2[i_rd] - np.sum(integrals_2[i_rd+1:])
+                    else:
+                        integral1_i_rd = integrals_1[i_rd]
+                        integral2_i_rd = integrals_2[i_rd]
+                        
+                    # N_Waveform	mult	tstart	index_peak	peak	integral1	integral2	integral3	halflife	temp
+                    f.write(f"{res_dict[i_rd]['original_wf']}"
+                            f"\t{res_dict[i_rd]['pk_idx']}"
+                            f"\t{res_dict[i_rd]['current_tstart']}"
+                            f"\t{res_dict[i_rd]['peaks']}"
+                            f"\t{res_dict[i_rd]['vpeack']}"
+                            f"\t{integral1_i_rd}"
+                            f"\t{integral2_i_rd}"
+                            f"\t{res_dict[i_rd]['integral3']}"
+                            f"\t{res_dict[i_rd]['halflife']}"
+                            f"\t{res_dict[i_rd]['temp']:.2f}\n")
+                    dl2_data.append([res_dict[i_rd]['original_wf'], 
+                                    res_dict[i_rd]['pk_idx'], 
+                                    res_dict[i_rd]['current_tstart'], 
+                                    res_dict[i_rd]['peaks'], 
+                                    res_dict[i_rd]['vpeack'], 
+                                    integral1_i_rd, 
+                                    integral2_i_rd, 
+                                    res_dict[i_rd]['integral3'], 
+                                    res_dict[i_rd]['halflife'], 
+                                    res_dict[i_rd]['temp']])
         h5file.close()
         GFhandler2.write(f"{Path(basename).with_suffix('.dl2.h5')}", dl2_data)
         f.close()
