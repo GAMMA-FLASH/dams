@@ -20,9 +20,9 @@ class DL0Decomposer():
         self.name    = name
         #self.data    = self.wfdl0[:, -1]  + self.arr_bias
         self.data    = self.wfdl0[:, -1]
-        self.mmean1  = np.mean(self.data[:100])
-        self.stdev1  = np.std(self.data[:100])
-        self.meanblocks = np.lib.stride_tricks.sliding_window_view(self.wfdl0[:, -1], self.blocksSize_dblEvent)
+        self.mmean1  = np.mean(self.data[:self.bkgbaselev_size])
+        self.stdev1  = np.std(self.data[:self.bkgbaselev_size])
+        self.meanblocks = np.lib.stride_tricks.sliding_window_view(self.wfdl0[:, -1], self.blocks_size)
         self.meanblocks = self.meanblocks.mean(axis=1)
         self.wvfrsdl1List = []
         self.attrsdl1List = []
@@ -41,14 +41,14 @@ class DL0Decomposer():
         This function returns the list of peaks found in each waveform.
         """
         # Extract array
-        arr = self.data
+        arr = self.data + self.arr_bias
         # Compute moving average
-        arrmov = self.__moving_average(arr, 15)
+        arrmov = self.__moving_average(arr, self.mavg_wsize)
         #
         mmean2 = self.mmean1 * 2 * 0.9
         # mmean2 = self.mmean1 + self.stdev1 * 1.96 
         # Find peaks
-        peaks, _ = find_peaks(arrmov, height=mmean2, width=15, distance=25)
+        peaks, _ = find_peaks(arrmov, height=mmean2, width=self.findpk_width, distance=self.findpk_distance)
         # Clone the peaks
         peaks2 = np.copy(peaks)
         # Filtering the peaks

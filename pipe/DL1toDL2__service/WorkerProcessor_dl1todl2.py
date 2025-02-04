@@ -1,11 +1,13 @@
 from WorkerBase import WorkerBase
-from dams.dl2.eventlist_v4 import Eventlist
+from dams.dl2.eventlist_v5 import Eventlist
 import os
 import json
 from printcolors import *
 import traceback
 
 class WorkerDL1toDL2(WorkerBase):
+	
+	
 	def __init__(self):
 		super().__init__()
 		# Create for eventlist

@@ -1,24 +1,24 @@
 import os
 import sys
 sys.path.append('../dl1')
+
 import glob
-import tables
 import argparse
 import numpy as np
 import pandas as pd
+import json
 from time import time
-from tables import *
 import h5py
 import tables as tb
 from pathlib import Path
 from tqdm import tqdm
 import traceback
 import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
-from multiprocessing import Pool
 from scipy.signal import find_peaks
-from tables.description import Float32Col
-from tables.description import Float64Col
+from tables.description import Float32Col, Float64Col
+import xml.etree.ElementTree as ET
+from typing import Dict
+
 
 from dl1_utils import DL1UtilsAtts
 
@@ -45,7 +45,7 @@ computing integrals, and handling temperature data.
 Introduce more robust handling of corrupted or incomplete data.
 '''
 
-class GFTable(IsDescription):
+class GFTable(tb.IsDescription):
     #N_Waveform\tmult\ttstart\tindex_peak\tpeak\tintegral1\tintegral2\tintegral3\thalflife\ttemp
     n_waveform = Float32Col()
     mult = Float32Col()
@@ -69,7 +69,7 @@ class GFhandler2:
         
         start = time()
         
-        h5file = tables.open_file(filename, "w", title="dl2")
+        h5file = tb.open_file(filename, "w", title="dl2")
 
         group = h5file.create_group("/", 'dl2', 'dl2 eventlist')
         """
@@ -111,21 +111,25 @@ class GFhandler2:
 
 
 class EventlistGeneral:
-    def __init__(self) -> None:
+    def __init__(self, config_detector: Dict) -> None:
         self.dl0_peaks = None
         self.version = None
+        self.configdict = config_detector
+        self.__dict__.update(config_detector)
+
 
     def moving_average(self, x, w):
         return np.convolve(x, np.ones(w), 'same') / w
     
+
     @staticmethod
     def twos_comp_to_int(val, bits=14):
         if (val & (1 << (bits - 1))) != 0: # if sign bit is set e.g., 8bit: 128-255
             val = val - (1 << bits)        # compute negative value
         return val
 
-    def process_temps_file(self, filename):
 
+    def process_temps_file(self, filename):
         #when reading the temperature file we must skip row with > 2 columns and drop error rows
         df = pd.read_csv(filename, names=["Time", "Temperature"], sep=',', on_bad_lines="skip")
         df = df.dropna()
@@ -133,7 +137,8 @@ class EventlistGeneral:
         df = df.astype({"Time":np.float64, "Temperature":np.float32})
 
         return df
-        
+
+
     def get_temperature(self, tstart):
         if self.temperatures is None:
             temp = -300
@@ -145,6 +150,7 @@ class EventlistGeneral:
             else:
                 temp = np.round(query["Temperature"].mean(), decimals=2)
         return temp
+
 
     def delete_empty_file(self, nome_file):
         # Verifica se il file esiste e ha lunghezza zero
@@ -161,6 +167,7 @@ class EventlistGeneral:
         else:
             print(f"Il file '{nome_file}' non esiste. Continuo")
 
+
     def create_directory(self, directory_path):
         if not os.path.exists(directory_path):
             os.makedirs(directory_path)
@@ -168,8 +175,8 @@ class EventlistGeneral:
 
 
 class EventlistDL0(EventlistGeneral):
-    def process_file(self, filename, temperatures, outdir, log=False, startEvent=0, endEvent=-1, pbar_show=False, 
-                     mavg_wsize=15, maxval=8192, bkgbaselev_size=100, findpk_width=15, findpk_distance=25, blocks_size=25):
+    def process_file(self, filename, temperatures, outdir, log=False, startEvent=0, endEvent=-1, pbar_show=False):
+                     #mavg_wsize=15, maxval=8192, bkgbaselev_size=100, findpk_width=15, findpk_distance=25, blocks_size=25):
         """
         Process a file containing waveforms of type `DL0` data to compute various parameters and save results.
 
@@ -207,7 +214,7 @@ class EventlistDL0(EventlistGeneral):
             return
         
         # Open the input HDF5 file for reading
-        h5file = open_file(filename, mode="r")
+        h5file = tb.open_file(filename, mode="r")
         self.temperatures = temperatures
 
         # Access the waveform group in the HDF5 file
@@ -246,7 +253,7 @@ class EventlistDL0(EventlistGeneral):
             tstart = data._v_attrs.tstart
             # Process waveform data to find peaks
             val = np.max(data[:,shape_data])
-            if val > maxval:
+            if val > self.saturationValue:
                 # Convert two's complement to integers
                 y = np.array(data[:,shape_data].shape)     
                 for i, val in enumerate(data[:,shape_data]):
@@ -255,27 +262,26 @@ class EventlistDL0(EventlistGeneral):
                 y = data[:,shape_data]
             
             # Create a copy of the waveform array for processing
-            arr = y.copy()
+            arr = y.copy() + self.arr_bias
             # Compute the moving average of the waveform
-            arrmov = self.moving_average(arr, mavg_wsize)
+            arrmov = self.moving_average(arr, self.mavg_wsize)
 
             # Extract peaks based on moving average and thresholds
-            arr3 = arr[:bkgbaselev_size].copy()
+            arr3 = arr[:self.bkgbaselev_size].copy()
             mmean1 = arr3.mean()
             stdev1 = arr3.std()
             mmean2 = mmean1 * 2 * 0.9 
-            peaks, _ = find_peaks(arrmov, height=mmean2, width=findpk_width, distance=findpk_distance)
+            peaks, _ = find_peaks(arrmov, height=mmean2, width=self.findpk_width, distance=self.findpk_distance)
             
             # Filter peaks based on predefined conditions
-            deltav = 20
             peaks2 = np.copy(peaks)
             for v in peaks2:
-                arrcalcMM = arrmov[v] - arrmov[v-deltav:v+deltav].copy()
+                arrcalcMM = arrmov[v] - arrmov[v-self.deltav:v+self.deltav].copy()
 
                 # 80 has been chosen with heuristics on data 
-                ind = np.where(arrcalcMM[:] > 80)
+                ind = np.where(arrcalcMM[:] > self.thr_heur)
                 # Remove peaks too small or peaks too close to the end of the wf
-                if len(ind[0]) == 0 or v > 16000:
+                if len(ind[0]) == 0 or v > self.thr_end_wf:
                     if log == True:
                         # Optionally log detailed information and plots
                         print("delete peak")
@@ -318,10 +324,10 @@ class EventlistDL0(EventlistGeneral):
                     rowsHalf = [0]
                     try:
                         # Calculation on raw data
-                        arrcalc = arr[v-deltav:].copy()
-                        arrcalc_tt  = arr_tt[v-deltav:].copy()
+                        arrcalc = arr[v-self.deltav:].copy()
+                        arrcalc_tt  = arr_tt[v-self.deltav:].copy()
                         
-                        arrcalc_blocks = np.lib.stride_tricks.sliding_window_view(arrcalc, blocks_size)
+                        arrcalc_blocks = np.lib.stride_tricks.sliding_window_view(arrcalc, self.blocks_size)
                         meanblock  = arrcalc_blocks.mean(axis=1)
                         rowsL = np.where(np.logical_and(meanblock > mmean1 - stdev1, 
                                                         meanblock < mmean1 + stdev1))[0]
@@ -338,11 +344,11 @@ class EventlistDL0(EventlistGeneral):
                         integral = np.sum(arrSub)
                         
                         # Extract peak height
-                        peak_height = arrSignal[deltav]
+                        peak_height = arrSignal[self.deltav]
 
                         # Calculation on MM
-                        arrcalcMM = arrmov[v-deltav:].copy()
-                        arrcalcMM_blocks = np.lib.stride_tricks.sliding_window_view(arrcalcMM, blocks_size)
+                        arrcalcMM = arrmov[v-self.deltav:].copy()
+                        arrcalcMM_blocks = np.lib.stride_tricks.sliding_window_view(arrcalcMM, self.blocks_size)
                         meanblockMM  = arrcalcMM_blocks.mean(axis=1)
                         rowsLMM = np.where(np.logical_and(meanblockMM > mmean1 - stdev1, 
                                                           meanblockMM < mmean1 + stdev1))[0]
@@ -355,16 +361,16 @@ class EventlistDL0(EventlistGeneral):
                         integralMM = np.sum(arrSubMM)
 
                         # Extract peak height
-                        # peak_height = arrSignalMM[deltav]
+                        # peak_height = arrSignalMM[self.deltav]
 
                         # Compare with exponential decay
                         arrExp = arrSubMM.copy()
-                        rowsHalf=np.where(arrExp[deltav:]<=arrExp[deltav]/2.0)[0]
-                        xr = range(deltav, len(arrExp)+deltav)
+                        rowsHalf=np.where(arrExp[self.deltav:]<=arrExp[self.deltav]/2.0)[0]
+                        xr = range(self.deltav, len(arrExp)+self.deltav)
                         xr2 = range(len(arrExp))
                         # N(t) = N_0 * 2^{-t/T}
-                        valueE = arrExp[deltav] * np.power(2, xr2 * (-1/(rowsHalf[0]-5)))
-                        integralExp = np.sum(valueE) + np.sum(arrSub[:deltav])
+                        valueE = arrExp[self.deltav] * np.power(2, xr2 * (-1/(rowsHalf[0]-5)))
+                        integralExp = np.sum(valueE) + np.sum(arrSub[:self.deltav])
 
                         # Subtract the exponential decay for pileup
                         if len(peaks) > 1:
@@ -375,9 +381,9 @@ class EventlistDL0(EventlistGeneral):
                             #       in teoria non dovrebbe cambiare nulla, ma ChatGPT suggerisce che talvolta quando due array 
                             #       condividono lo stesso spazio in memoria alcune operazioni anche se non eseguono accessi diretti
                             #       potrebbero modificarne il valore associato 
-                            ss = arrmov[v-deltav:lenss].copy()
-                            ss[deltav:lenss] = ss[deltav:lenss] - valueE[0:len(ss[deltav:lenss])]
-                            ss[0:deltav] = np.full(len(ss[0:deltav]), mmean1)
+                            ss = arrmov[v-self.deltav:lenss].copy()
+                            ss[self.deltav:lenss] = ss[self.deltav:lenss] - valueE[0:len(ss[self.deltav:lenss])]
+                            ss[0:self.deltav] = np.full(len(ss[0:self.deltav]), mmean1)
                         
                         # Plot arr, arrmov and peaks
                         if log == True:
@@ -399,7 +405,7 @@ class EventlistDL0(EventlistGeneral):
                             plt.figure()
                             plt.plot(range(len(arrSub)),arrSub, label='arrSub')
                             plt.plot(range(len(arrSubMM)),arrSubMM, label='arrSubMM', color='black')
-                            plt.axvline(x=deltav, label='peak', color = 'r')
+                            plt.axvline(x=self.deltav, label='peak', color = 'r')
                             plt.plot(xr, valueE, label='exponantial decay', color = 'r')
                             if len(peaks) > 1:
                                 plt.plot(range(len(ss)),ss-mmean1, label='ss-mmean1')
@@ -486,9 +492,12 @@ class EventlistDL0(EventlistGeneral):
         f.close()
 
 class EventlistDL1(EventlistGeneral):
-    def __init__(self, xml_model_path: str) -> None:
-        super().__init__()
+    def __init__(self, 
+                 xml_model_path: str, 
+                 config_detector: Dict) -> None:
+        super().__init__(config_detector)
         self.dl1attrs = DL1UtilsAtts(xml_model_path)
+        self.config_detector = config_detector
 
     def __getPeaks(self, peaks, wf_start):
         start_off = wf_start
@@ -505,8 +514,8 @@ class EventlistDL1(EventlistGeneral):
             # NOTE: in DL0 wf with more than a PK get a +1
             return peak_idx + j + 1
 
-    def process_file(self, filename, temperatures, outdir, log = False, startEvent=0, endEvent=-1, pbar_show=False, 
-                     mavg_wsize=15, maxval=8192, bkgbaselev_size=100, findpk_width=15, findpk_distance=25, blocks_size=25):
+    def process_file(self, filename, temperatures, outdir, log = False, startEvent=0, endEvent=-1, pbar_show=False):
+                     # mavg_wsize=15, maxval=8192, bkgbaselev_size=100, findpk_width=15, findpk_distance=25, blocks_size=25):
         """
         Process a file containing waveforms of type `DL0` data to compute various parameters and save results.
 
@@ -583,36 +592,35 @@ class EventlistDL1(EventlistGeneral):
             val = np.max(data)
 
             # Create a copy of the waveform array for processing
-            y = data
-            if val > maxval:
+            y = data + self.arr_bias
+            if val > self.saturationValue:
                 for t, val in enumerate(data):
                     y[t] = Eventlist.twos_comp_to_int(val)
             
             # Deep copy of y array 
             arr = y.copy()
             # Compute moving average
-            arrmov = self.moving_average(arr, mavg_wsize)
+            arrmov = self.moving_average(arr, self.mavg_wsize)
 
             if self.dl1attrs.get_attr(h5file, i, 'n_peaks') == 0:
                 # If in DL1 we didn't find any peak the list should be empty
                 peaks = np.array([])
             elif isdoubleEvent:
                 # If it is a double event
-                peaks, _ = find_peaks(arrmov, height=mmean1*2* 0.9, width=findpk_width, distance=findpk_distance)
+                peaks, _ = find_peaks(arrmov, height=mmean1*2* 0.9, width=self.findpk_width, distance=self.findpk_distance)
             else:
                 # If it is a single event event 
                 peaks  = np.array([self.dl1attrs.get_attr(h5file, i, 'peak_pos') - wf_start])
             
             # Extract peaks based on moving average and thresholds
-            deltav = 20
             peaks2 = np.copy(peaks)
             for v in peaks2:
-                arrcalcMM = arrmov[v] - arrmov[v-deltav:v+deltav].copy()
+                arrcalcMM = arrmov[v] - arrmov[v-self.deltav:v+self.deltav].copy()
 
                 # 80 has been chosen with heuristics on data 
-                ind = np.where(arrcalcMM[:] > 80)
+                ind = np.where(arrcalcMM[:] > self.thr_heur)
                 # Remove peaks too small or peaks too close to the end of the wf
-                if len(ind[0]) == 0 or v > 16000:
+                if len(ind[0]) == 0 or v > self.thr_end_wf:
                     if log == True:
                         # Optionally log detailed information and plots
                         print("delete peak")
@@ -655,10 +663,10 @@ class EventlistDL1(EventlistGeneral):
                     rowsHalf = [0]
                     try:
                         # Calculation on raw data
-                        arrcalc = arr[v-deltav:].copy()
-                        arrcalc_tt  = arr_tt[v-deltav:].copy()
+                        arrcalc = arr[v-self.deltav:].copy()
+                        arrcalc_tt  = arr_tt[v-self.deltav:].copy()
 
-                        arrcalc_blocks = np.lib.stride_tricks.sliding_window_view(arrcalc, blocks_size)
+                        arrcalc_blocks = np.lib.stride_tricks.sliding_window_view(arrcalc, self.blocks_size)
                         meanblock  = arrcalc_blocks.mean(axis=1)
                         rowsL = np.where(np.logical_and(meanblock > mmean1 - stdev1, 
                                                         meanblock < mmean1 + stdev1))[0]
@@ -675,11 +683,11 @@ class EventlistDL1(EventlistGeneral):
                         integral = np.sum(arrSub)
 
                         # Extract peak height
-                        peak_height = arrSignal[deltav]
+                        peak_height = arrSignal[self.deltav]
 
                         # Calculation on MM
-                        arrcalcMM = arrmov[v-deltav:].copy()
-                        arrcalcMM_blocks = np.lib.stride_tricks.sliding_window_view(arrcalcMM, blocks_size)
+                        arrcalcMM = arrmov[v-self.deltav:].copy()
+                        arrcalcMM_blocks = np.lib.stride_tricks.sliding_window_view(arrcalcMM, self.blocks_size)
                         meanblockMM  = arrcalcMM_blocks.mean(axis=1)
                         rowsLMM = np.where(np.logical_and(meanblockMM > mmean1 - stdev1, 
                                                           meanblockMM < mmean1 + stdev1))[0]
@@ -692,16 +700,16 @@ class EventlistDL1(EventlistGeneral):
                         integralMM = np.sum(arrSubMM)
 
                         # Extract peak height
-                        # peak_height = arrSignalMM[deltav]
+                        # peak_height = arrSignalMM[self.deltav]
 
                         # Compare with exponential decay
                         arrExp = arrSubMM.copy()
-                        rowsHalf=np.where(arrExp[deltav:]<=arrExp[deltav]/2.0)[0]
-                        xr = range(deltav, len(arrExp)+deltav)
+                        rowsHalf=np.where(arrExp[self.deltav:]<=arrExp[self.deltav]/2.0)[0]
+                        xr = range(self.deltav, len(arrExp)+self.deltav)
                         xr2 = range(len(arrExp))
                         # N(t) = N_0 * 2^{-t/T}
-                        valueE = arrExp[deltav] * np.power(2, xr2 * (-1/(rowsHalf[0]-5)))
-                        integralExp = np.sum(valueE) + np.sum(arrSub[:deltav])
+                        valueE = arrExp[self.deltav] * np.power(2, xr2 * (-1/(rowsHalf[0]-5)))
+                        integralExp = np.sum(valueE) + np.sum(arrSub[:self.deltav])
 
                         # Subtract the exponential decay for pileup
                         if len(peaks) > 1:
@@ -712,9 +720,9 @@ class EventlistDL1(EventlistGeneral):
                             #       in teoria non dovrebbe cambiare nulla, ma ChatGPT suggerisce che talvolta quando due array 
                             #       condividono lo stesso spazio in memoria alcune operazioni anche se non eseguono accessi diretti
                             #       potrebbero modificarne il valore associato 
-                            ss = arrmov[v-deltav:lenss].copy()
-                            ss[deltav:lenss] = ss[deltav:lenss] - valueE[0:len(ss[deltav:lenss])]
-                            ss[0:deltav] = np.full(len(ss[0:deltav]), mmean1)
+                            ss = arrmov[v-self.deltav:lenss].copy()
+                            ss[self.deltav:lenss] = ss[self.deltav:lenss] - valueE[0:len(ss[self.deltav:lenss])]
+                            ss[0:self.deltav] = np.full(len(ss[0:self.deltav]), mmean1)
                         
                         # Plot arr, arrmov and peaks
                         if log == True:
@@ -737,7 +745,7 @@ class EventlistDL1(EventlistGeneral):
                             plt.figure()
                             plt.plot(range(len(arrSub)),arrSub, label='arrSub')
                             plt.plot(range(len(arrSubMM)),arrSubMM, label='arrSubMM', color='black')
-                            plt.axvline(x=deltav, label='peak', color = 'r')
+                            plt.axvline(x=self.deltav, label='peak', color = 'r')
                             plt.plot(xr, valueE, label='exponantial decay', color = 'r')
                             if len(peaks) > 1:
                                 plt.plot(range(len(ss)),ss-mmean1, label='ss-mmean1')
@@ -820,33 +828,48 @@ class EventlistDL1(EventlistGeneral):
 class Eventlist:
     def __init__(self, 
                  from_dl1: bool = False,
-                 xml_model_path: str = 'none') -> None:
+                 xml_model_path: str = 'none',
+                 config_detector: str = 'none',
+                 ) -> None:
         self.from_dl1=from_dl1
+        with open(config_detector, 'r') as configfile:
+            config = json.load(configfile)
+            self.xlen = config['xlen']
+            self.configdict = config
+
         if not self.from_dl1:
-            self.evntlist = EventlistDL0()
+            self.evntlist = EventlistDL0(config_detector=self.configdict)
         else:
-            self.evntlist = EventlistDL1(xml_model_path)
+            self.evntlist = EventlistDL1(xml_model_path=xml_model_path,
+                                         config_detector=self.configdict)
+
 
     def moving_average(self, x, w):
         self.evntlist.moving_average(x, w)
-    
+
+
     def twos_comp_to_int(self, val, bits=14):
         self.twos_comp_to_int(val, bits=bits)
 
+
     def process_temps_file(self, filename):
         self.evntlist.process_temps_file(filename)
-    
+
+
     def get_temperature(self, tstart):
         self.evntlist.get_temperature(tstart)
+
 
     def delete_empty_file(self, nome_file):
         self.evntlist.delete_empty_file(nome_file)
 
+
     def create_directory(self, directory_path):
         self.evntlist.create_directory(directory_path)
 
-    def process_file(self, filename, temperatures, outdir, log=False, startEvent=0, endEvent=-1, pbar_show=False, 
-                     mavg_wsize=15, maxval=8192, bkgbaselev_size=100, findpk_width=15, findpk_distance=25, blocks_size=25):
+
+    def process_file(self, filename, temperatures, outdir, log=False, startEvent=0, endEvent=-1, pbar_show=False):
+                     # mavg_wsize=15, maxval=8192, bkgbaselev_size=100, findpk_width=15, findpk_distance=25, blocks_size=25):
         """
         Process a file containing waveform of type `DL0` data to compute various parameters and save results.
         
@@ -866,11 +889,9 @@ class Eventlist:
             findpk_distance (int): Required minimal horizontal distance in samples between neighbouring peaks, default 25
             blocks_size (int): Block size for computing the mean
         """
-        self.evntlist.process_file(filename, temperatures, outdir, log=log, startEvent=startEvent, endEvent=endEvent, pbar_show=pbar_show,
-                                   mavg_wsize=mavg_wsize, maxval=maxval, bkgbaselev_size=bkgbaselev_size, findpk_width=findpk_width, 
-                                   findpk_distance=findpk_distance, blocks_size=blocks_size)
-
-
+        self.evntlist.process_file(filename, temperatures, outdir, log=log, startEvent=startEvent, endEvent=endEvent, pbar_show=pbar_show)
+                                   #mavg_wsize=mavg_wsize, maxval=maxval, bkgbaselev_size=bkgbaselev_size, findpk_width=findpk_width, 
+                                   #findpk_distance=findpk_distance, blocks_size=blocks_size)
 
 
     def generate_simulated_dl0(

@@ -1,5 +1,5 @@
 from WorkerBase import WorkerBase
-from dams.dl2.eventlist_v4 import Eventlist
+from dams.dl2.eventlist_v5 import Eventlist
 import os
 import json
 import traceback
