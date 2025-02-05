@@ -6,16 +6,45 @@ import traceback
 
 DL02DL2_DETECTOR_CFG_ENV="DL02DL2_DETECTOR_CFG"
 DEFAULT_CFG='/home/gamma/workspace/dams/dl1/dl02dl1_config_SiPM.json'
+
 class WorkerDL0toDL1(WorkerBase):
 	def __init__(self):
+		self.config_detector = 'None'
 		super().__init__()
 		# Create for eventlist
-		self.snapeventlist = EventlistSnapshot(
-			os.getenv(DL02DL2_DETECTOR_CFG_ENV, DEFAULT_CFG), # Config file
-			'/home/gamma/workspace/dams/dl1/DL1model.xml'		  # XML model
-		)
+		self.snapeventlist = None
+
+	def config(self, configuration):
+		# super().config(configuration)
+		pidtarget = configuration['header']['pidtarget']
+		if pidtarget == self.workersname or pidtarget == self.fullname or pidtarget == 'all':
+			self.config_detector = configuration['config']['config']
+			if os.path.exists(self.config_detector):
+				print(f"Received config: {configuration}")
+				self.snapeventlist = EventlistSnapshot(
+					self.config_detector, 								  # Config file
+					'/home/gamma/workspace/dams/dl1/DL1model.xml'		  # XML model
+				)
+				self.logger.debug(f"DL0toDL1 configured! {self.config_detector}!")
+				self.logger.debug(f"############################################")
+				self.logger.debug(f"{self.snapeventlist}, {self}")
+				self.logger.debug(f"############################################")
+			else:
+				self.logger.warning(f"This configuration file {self.config_detector} for SnapshotEventlist doesn't exist!\nPlease provide a valid file!" )
+				raise Exception(f"This configuration file {self.config_detector} for SnapshotEventlist doesn't exist!\nPlease provide a valid file!")
+		self.logger.debug(f"############################################")
+		self.logger.debug(f"{self.snapeventlist}")
+		self.logger.debug(f"############################################")
+
 
 	def process_data(self, data, priority):
+		self.logger.debug(f"############################################")
+		self.logger.debug(f"{self.snapeventlist}, {self}")
+		self.logger.debug(f"############################################")
+		if self.snapeventlist is None:
+			self.logger.warning("DL0toDL1 SnapshotEventlist not still configured! Please send configuration file!")
+			raise Exception("DL0toDL1 SnapshotEventlist not still configured! Please send configuration file!")
+
 		if self.supervisor.dataflowtype == "binary" or self.supervisor.dataflowtype == "filename":
 			self.logger.critical(f"A string dataflowtype is expected instead of \'{self.supervisor.dataflowtype}\'", extra=self.workersname)
 			raise Exception("A string dataflowtype is expected")
@@ -29,7 +58,7 @@ class WorkerDL0toDL1(WorkerBase):
 			# Process DL0 to DL1
 			# self.logger.info(f"Starting processing \'{dest1}\'", extra=self.workersname)
 			try:
-				self.snapeventlist.process_file(source, dest1)
+				self.snapeventlist.process_file(source, dest1, pbar_show=True)
 				self.logger.info(f"Processing complete \'{source}\'", extra=self.workersname)
 				# Get filename
 				filename = os.path.basename(source.replace('.h5', '.dl1.h5'))

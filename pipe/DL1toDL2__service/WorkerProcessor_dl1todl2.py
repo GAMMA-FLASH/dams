@@ -6,17 +6,34 @@ from printcolors import *
 import traceback
 
 class WorkerDL1toDL2(WorkerBase):
-	
+	def config(self, configuration):
+		pidtarget = configuration['header']['pidtarget']
+		if pidtarget == self.workersname or pidtarget == self.fullname or pidtarget == 'all':
+			self.config_detector = configuration['config']['config']
+			if os.path.exists(self.config_detector):
+				print(f"Received config: {configuration}")
+				self.eventlist_dl1 = Eventlist(
+					from_dl1=True,
+					config_detector=self.config_detector, 						# Config file
+					xml_model_path='/home/gamma/workspace/dams/dl1/DL1model.xml'
+				)
+				self.logger.debug(f"DL1toDL2 configured! {self.config_detector}!")
+			else:
+				self.logger.warning(f"This configuration file {self.config_detector} for Eventlist doesn't exist!\nPlease provide a valid file!" )
+				raise Exception(f"This configuration file {self.config_detector} for Eventlist doesn't exist!\nPlease provide a valid file!")
+		else: 
+			return
 	
 	def __init__(self):
 		super().__init__()
 		# Create for eventlist
-		self.eventlist = Eventlist(
-			from_dl1=True,
-			xml_model_path='/home/gamma/workspace/dams/dl1/DL1model.xml'
-		)
+		self.eventlist_dl1 = None
 
 	def process_data(self, data, priority):
+		if self.eventlist_dl1 is None:
+			self.logger.warning("DL1toDL2 Eventlist not still configured! Please send configuration file!")
+			raise Exception("DL1toDL2 Eventlist not still configured! Please send configuration file!")
+		
 		if self.supervisor.dataflowtype == "binary" or self.supervisor.dataflowtype == "filename":
 			self.logger.critical(f"A string dataflowtype is expected instead of \'{self.supervisor.dataflowtype}\'", extra=self.workersname)
 			raise Exception("A string dataflowtype is expected")
@@ -29,7 +46,7 @@ class WorkerDL1toDL2(WorkerBase):
 				source = data["source"]
 				dest = data["dest"]
 				# Process DL1 to DL2
-				self.eventlist.process_file(source, None, dest)
+				self.eventlist_dl1.process_file(source, None, dest)
 				self.logger.info(f"Processing complete \'{source}\'", extra=self.workersname)
 				# Get filename
 				filename = os.path.basename(source.replace('.h5', '.dl2.h5'))

@@ -2,6 +2,7 @@ import os
 import argparse
 import subprocess
 import time
+import sys
 
 def start_dl0_publisher(args):
     """
@@ -118,13 +119,29 @@ def send_command(args):
     Parameters:
         args (Namespace): Parsed command-line arguments containing paths and socket configurations.
     """
-    print("========= START Monitoring ========")
+    print("========= SENDING Command ========")
     if not args.command_type or not args.target_processname:
         print("Error: --command-type and --target-processname are required for this action.")
         sys.exit(1)
     subprocess.run([
         "python", "/home/gamma/dependencies/rta-dataprocessor/workers/SendCommand.py",
         f"{args.json_path}", f"{args.command_type}", f"{args.target_processname}"
+    ])
+
+def send_config(args):
+    """
+    Stop all service.
+    
+    Parameters:
+        args (Namespace): Parsed command-line arguments containing paths and socket configurations.
+    """
+    print("========= SENDING Configuration ========")
+    if not args.detector_config or not args.target_processname:
+        print("Error: --detector-config and --target-processname are required for this action.")
+        sys.exit(1)
+    subprocess.run([
+        "python", "/home/gamma/dependencies/rta-dataprocessor/workers/SendConfig.py",
+        f"{args.json_path}", f"{args.target_processname}", f"{args.detector_config}"
     ])
 
 ########################################################################################################################
@@ -136,7 +153,7 @@ def main():
     parser = argparse.ArgumentParser(description="Script to start various GammaFlash services.")
     parser.add_argument(
         "-N", "--service-number", 
-        type=int, choices=[0, 1, 2, 3, 4, 5, 10, 20],
+        type=int, choices=[0, 1, 2, 3, 4, 5, 10, 20, 30],
         help=(
             "0: Start DL0Publisher\n"
             "1: Start DL0toDL2__service\n"
@@ -148,6 +165,8 @@ def main():
             "10: Start Monitoring\n"
             ##########
             "20: Send command\n"
+            ##########
+            "30: Send detector config\n"
         )
     )
     parser.add_argument("-dl0", "--path-dl0", 
@@ -177,6 +196,9 @@ def main():
     parser.add_argument("-t", "--target-processname", 
                         default="all",
                         help="Target process name for sending command")
+    parser.add_argument("-d", "--detector-config", 
+                        default="/home/gamma/workspace/dams/dl1/detectorconfig_PMT.json",
+                        help="Detectort configuration file path.")
 
     args = parser.parse_args()
 
@@ -189,6 +211,7 @@ def main():
         5: start_dl2_publisher,
         10: monitoring,
         20: send_command,
+        30: send_config,
     }
 
     action = actions.get(args.service_number)

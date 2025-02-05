@@ -116,6 +116,8 @@ options:
                         Command type for sending command
   -t TARGET_PROCESSNAME, --target-processname TARGET_PROCESSNAME
                         Target process name for sending command
+  -d DETECTOR_CONFIG, --detector-config DETECTOR_CONFIG
+                        Detectort configuration file path.
 ```
 
 1. Start the three DL services:
@@ -163,3 +165,27 @@ options:
     ```[bash]
     ./test_GammaFlash.py -N 0
     ```
+
+## Simple test pipeline
+
+```[bash]
+python test_GammaFlash.py -N 1 
+
+python test_GammaFlash.py -N 2
+
+python test_GammaFlash.py -N 3
+
+python test_GammaFlash.py -N 30 -d /home/gamma/workspace/dams/dl1/dl02dl1_config_PMT.json -t all
+
+python test_GammaFlash.py -N 20 -c start -f /home/gamma/workspace/dams/pipe/config.json -t all
+
+python test_GammaFlash.py -N 0 -dl0 /home/gamma/workspace/Data/tmp/DL0 -dl1 /home/gamma/workspace/Data/tmp/DL1 -dl2 /home/gamma/workspace/Data/tmp/DL2
+
+```
+
+To stop the pipeline
+```[python]
+python test_GammaFlash.py -N 20 -c stop -f /home/gamma/workspace/dams/pipe/config.json -t all
+
+python test_GammaFlash.py -N 20 -c cleanedshutdown -f /home/gamma/workspace/dams/pipe/config.json -t all
+```

@@ -13,8 +13,8 @@
   {
 	"processname": "DL0toDL2",
 	"dataflow_type": "string",
-	"processing_type": "process",
-	"datasocket_type": "pushpull",
+	"processing_type": "thread",
+	"datasocket_type": "pubsub",
 	"data_lp_socket": "tcp://127.0.0.1:5555",
 	"data_hp_socket": "tcp://127.0.0.1:5556",
 	"command_socket": "tcp://127.0.0.1:5551",
@@ -37,8 +37,8 @@
   {
 	"processname": "DL0toDL1",
 	"dataflow_type": "string",
-	"processing_type": "process",
-	"datasocket_type": "pushpull",
+	"processing_type": "thread",
+	"datasocket_type": "pubsub",
 	"data_lp_socket": "tcp://127.0.0.1:5555",
 	"data_hp_socket": "tcp://127.0.0.1:5556",
 	"command_socket": "tcp://127.0.0.1:5551",
@@ -61,7 +61,7 @@
   {
 	"processname": "DL1toDL2",
 	"dataflow_type": "string",
-	"processing_type": "process",
+	"processing_type": "thread",
 	"datasocket_type": "pubsub",
 	"data_lp_socket": "tcp://127.0.0.1:5553",
 	"data_hp_socket": "tcp://127.0.0.1:5560",
@@ -85,7 +85,7 @@
   {
 	"processname": "DL2Checker",
 	"dataflow_type": "string",
-	"processing_type": "process",
+	"processing_type": "thread",
 	"datasocket_type": "pushpull",
 	"data_lp_socket": "tcp://127.0.0.1:5554",
 	"data_hp_socket": "tcp://127.0.0.1:5560",

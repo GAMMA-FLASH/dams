@@ -5,12 +5,33 @@ import json
 import traceback
 
 class WorkerDL0toDL2(WorkerBase):
+	def config(self, configuration):
+		pidtarget = configuration['header']['pidtarget']
+		if pidtarget == self.workersname or pidtarget == self.fullname or pidtarget == 'all':
+			self.config_detector = configuration['config']['config']
+			if os.path.exists(self.config_detector):
+				print(f"Received config: {configuration}")
+				self.eventlist_dl0 = Eventlist(
+					from_dl1=False,
+					config_detector=self.config_detector, 						# Config file
+				)
+				self.logger.debug(f"DL0toDL2 configured! {self.config_detector}!")
+			else:
+				self.logger.warning(f"This configuration file {self.config_detector} for Eventlist doesn't exist!\nPlease provide a valid file!" )
+				raise Exception(f"This configuration file {self.config_detector} for Eventlist doesn't exist!\nPlease provide a valid file!")
+		else: 
+			return
+		
 	def __init__(self):
 		super().__init__()
 		# Create for eventlist
-		self.eventlist_dl0 = Eventlist()
+		self.eventlist_dl0 = None
 
 	def process_data(self, data, priority):
+		if self.eventlist_dl0 is None:
+			self.logger.warning("DL0toDL2 Eventlist not still configured! Please send configuration file!")
+			raise Exception("DL0toDL2 Eventlist not still configured! Please send configuration file!")
+
 		if self.supervisor.dataflowtype == "binary" or self.supervisor.dataflowtype == "filename":
 			self.logger.critical(f"A string dataflowtype is expected instead of \'{self.supervisor.dataflowtype}\'", extra=self.workersname)
 			raise Exception("A string dataflowtype is expected")

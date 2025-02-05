@@ -80,8 +80,8 @@ if __name__ == "__main__":
     time_sleep_inframessage = float(sys.argv[5])
     # Bind socket
     context = zmq.Context()
-    socket = context.socket(zmq.PUSH)
-    socket.connect(socketstring)
+    socket = context.socket(zmq.PUB)
+    socket.bind(socketstring)
     # Publish DL0 files recursive mode
     publish(path_dl0, path_dl1, path_dl2, True, socket, time_sleep_inframessage)
     
