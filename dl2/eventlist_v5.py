@@ -214,11 +214,13 @@ class EventlistDL0(EventlistGeneral):
             return
         
         # Open the input HDF5 file for reading
-        h5file = tb.open_file(filename, mode="r")
+        # h5file = tb.open_file(filename, mode="r")
+        h5file = h5py.File(filename, mode='r')
         self.temperatures = temperatures
 
         # Access the waveform group in the HDF5 file
-        group = h5file.get_node("/waveforms")
+        # group = h5file.get_node("/waveforms")
+        waveforms = h5file["/waveforms"]
         tstarts = []
 
         header = f"N_Waveform\tmult\ttstart\tindex_peak\tpeak\tintegral1\tintegral2\tintegral3\thalflife\ttemp"
@@ -231,8 +233,10 @@ class EventlistDL0(EventlistGeneral):
         lenwf = -1      # Length of the waveform data
         
         # Iterate over waveforms in the HDF5 group
-        for i, data in tqdm(enumerate(group), disable=not pbar_show, 
-                            total=endEvent+1 if endEvent > 0 else group._g_getnchildren()):
+        # for i, data in tqdm(enumerate(group), disable=not pbar_show, 
+        #                    total=endEvent+1 if endEvent > 0 else group._g_getnchildren()):
+        for i, wf_name in tqdm(enumerate(waveforms), disable=not pbar_show,
+                               total=endEvent+1 if endEvent > 0 else len(waveforms)):
             # Skip events before the startEvent index
             if i < int(startEvent):
                 continue
@@ -240,17 +244,22 @@ class EventlistDL0(EventlistGeneral):
             if endEvent > 0:
                 if i > int(endEvent):
                     break
+            # Get the dataset of the current waveform
+            data = waveforms[wf_name]
+            version_wf = data.attrs['VERSION'].decode('utf-8')
             # Determine the data structure version (1.1 or 2.0)
             if shape_data < 0:
-                if data._v_attrs.VERSION == "1.1":
+                if "1." in version_wf:
                     shape_data = 1
-                elif data._v_attrs.VERSION == "2.0":
+                elif "2." in version_wf:
                     shape_data = 0
             
             # Get waveform length and start time
             lenwf = len(data[:,shape_data])
+            # data = np.array(data).flatten()
             # Get tstart
-            tstart = data._v_attrs.tstart
+            # tstart = data._v_attrs.tstart
+            tstart = data.attrs['tstart']
             # Process waveform data to find peaks
             val = np.max(data[:,shape_data])
             if val > self.saturationValue:
@@ -369,7 +378,7 @@ class EventlistDL0(EventlistGeneral):
                         xr = range(self.deltav, len(arrExp)+self.deltav)
                         xr2 = range(len(arrExp))
                         # N(t) = N_0 * 2^{-t/T}
-                        valueE = arrExp[self.deltav] * np.power(2, xr2 * (-1/(rowsHalf[0]-5)))
+                        valueE = arrExp[self.deltav] * np.power(2, xr2 * (-1/(rowsHalf[0])))
                         integralExp = np.sum(valueE) + np.sum(arrSub[:self.deltav])
 
                         # Subtract the exponential decay for pileup
@@ -436,7 +445,7 @@ class EventlistDL0(EventlistGeneral):
                             "temp": temp
                         })
                     else:
-                        current_tstart = float(((peaks[j] - peaks[0]) * data._v_attrs.Dec * 8e-9) + tstart)
+                        current_tstart = float(((peaks[j] - peaks[0]) * data.attrs['Dec'] * 8e-9) + tstart)
                         res_dict.append({
                             "original_wf": i,
                             "pk_idx": j+1,
