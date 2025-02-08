@@ -2,29 +2,29 @@
 	{
         "processname": "Monitoring",
         "monitoring_forwarder":"off",
-        "forwarder_frontend_socket": "tcp://127.0.0.1:5552",
-        "forwarder_backend_socket": "tcp://127.0.0.1:5562",
-        "monitoring_socket": "tcp://127.0.0.1:5562"
+        "forwarder_frontend_socket": "tcp://127.0.0.1:5502",
+        "forwarder_backend_socket": "tcp://127.0.0.1:5503",
+        "monitoring_socket": "tcp://127.0.0.1:5503"
     },
 	{
         "processname": "CommandCenter",
-        "command_socket": "tcp://127.0.0.1:5551"      
+        "command_socket": "tcp://127.0.0.1:5501"      
     },
   {
 	"processname": "DL0toDL2",
 	"dataflow_type": "string",
 	"processing_type": "thread",
 	"datasocket_type": "pubsub",
-	"data_lp_socket": "tcp://127.0.0.1:5555",
-	"data_hp_socket": "tcp://127.0.0.1:5556",
-	"command_socket": "tcp://127.0.0.1:5551",
-	"monitoring_socket": "tcp://127.0.0.1:5562",
+	"data_lp_socket": "tcp://127.0.0.1:5515",
+	"data_hp_socket": "tcp://127.0.0.1:5516",
+	"command_socket": "tcp://127.0.0.1:5501",
+	"monitoring_socket": "tcp://127.0.0.1:5503",
 	"manager": [
         {
             "result_socket_type": "pushpull",
             "result_dataflow_type": "string",
-            "result_lp_socket": "tcp://127.0.0.1:5554",
-            "result_hp_socket": "tcp://127.0.0.1:5560",
+            "result_lp_socket": "tcp://127.0.0.1:5535",
+            "result_hp_socket": "tcp://127.0.0.1:5536",
             "num_workers": 2,
             "name": "dl0todl2",
             "name_workers": "worker"
@@ -39,16 +39,16 @@
 	"dataflow_type": "string",
 	"processing_type": "thread",
 	"datasocket_type": "pubsub",
-	"data_lp_socket": "tcp://127.0.0.1:5555",
-	"data_hp_socket": "tcp://127.0.0.1:5556",
-	"command_socket": "tcp://127.0.0.1:5551",
-	"monitoring_socket": "tcp://127.0.0.1:5562",
+	"data_lp_socket": "tcp://127.0.0.1:5515",
+	"data_hp_socket": "tcp://127.0.0.1:5516",
+	"command_socket": "tcp://127.0.0.1:5501",
+	"monitoring_socket": "tcp://127.0.0.1:5503",
 	"manager": [
         {
             "result_socket_type": "pubsub",
             "result_dataflow_type": "string",
-            "result_lp_socket": "tcp://127.0.0.1:5553",
-            "result_hp_socket": "tcp://127.0.0.1:5560",
+            "result_lp_socket": "tcp://127.0.0.1:5525",
+            "result_hp_socket": "tcp://127.0.0.1:5526",
             "num_workers": 2,
             "name": "dl0todl1",
             "name_workers": "worker"
@@ -63,16 +63,16 @@
 	"dataflow_type": "string",
 	"processing_type": "thread",
 	"datasocket_type": "pubsub",
-	"data_lp_socket": "tcp://127.0.0.1:5553",
-	"data_hp_socket": "tcp://127.0.0.1:5560",
-	"command_socket": "tcp://127.0.0.1:5551",
-	"monitoring_socket": "tcp://127.0.0.1:5562",
+	"data_lp_socket": "tcp://127.0.0.1:5525",
+	"data_hp_socket": "tcp://127.0.0.1:5526",
+	"command_socket": "tcp://127.0.0.1:5501",
+	"monitoring_socket": "tcp://127.0.0.1:5503",
 	"manager": [
         {
             "result_socket_type": "pushpull",
             "result_dataflow_type": "string",
-            "result_lp_socket": "tcp://127.0.0.1:5554",
-            "result_hp_socket": "tcp://127.0.0.1:5560",
+            "result_lp_socket": "tcp://127.0.0.1:5535",
+            "result_hp_socket": "tcp://127.0.0.1:5536",
             "num_workers": 2,
             "name": "dl1todl2",
             "name_workers": "worker"
@@ -87,10 +87,10 @@
 	"dataflow_type": "string",
 	"processing_type": "thread",
 	"datasocket_type": "pushpull",
-	"data_lp_socket": "tcp://127.0.0.1:5554",
-	"data_hp_socket": "tcp://127.0.0.1:5560",
-	"command_socket": "tcp://127.0.0.1:5551",
-	"monitoring_socket": "tcp://127.0.0.1:5562",
+	"data_lp_socket": "tcp://127.0.0.1:5535",
+	"data_hp_socket": "tcp://127.0.0.1:5536",
+	"command_socket": "tcp://127.0.0.1:5501",
+	"monitoring_socket": "tcp://127.0.0.1:5503",
 	"manager": [
         {
             "result_socket_type": "none",

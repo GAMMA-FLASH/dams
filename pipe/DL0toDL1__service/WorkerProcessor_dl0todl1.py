@@ -15,32 +15,26 @@ class WorkerDL0toDL1(WorkerBase):
 		self.snapeventlist = None
 
 	def config(self, configuration):
-		# super().config(configuration)
+		# Get pid target
 		pidtarget = configuration['header']['pidtarget']
-		if pidtarget == self.workersname or pidtarget == self.fullname or pidtarget == 'all':
+		# Check if current supervisor is in the pidtarget
+		if pidtarget == self.supervisor.name or pidtarget == "all".lower() or pidtarget == "*":
+			# Get configuration
 			self.config_detector = configuration['config']['config']
+			# Check if it exists the configuration json file
 			if os.path.exists(self.config_detector):
 				print(f"Received config: {configuration}")
+				# Init processing object
 				self.snapeventlist = EventlistSnapshot(
 					self.config_detector, 								  # Config file
 					'/home/gamma/workspace/dams/dl1/DL1model.xml'		  # XML model
 				)
-				self.logger.debug(f"DL0toDL1 configured! {self.config_detector}!")
-				self.logger.debug(f"############################################")
-				self.logger.debug(f"{self.snapeventlist}, {self}")
-				self.logger.debug(f"############################################")
+				self.logger.debug(f"DL0toDL1 configured with - {self.config_detector}!")
 			else:
 				self.logger.warning(f"This configuration file {self.config_detector} for SnapshotEventlist doesn't exist!\nPlease provide a valid file!" )
 				raise Exception(f"This configuration file {self.config_detector} for SnapshotEventlist doesn't exist!\nPlease provide a valid file!")
-		self.logger.debug(f"############################################")
-		self.logger.debug(f"{self.snapeventlist}")
-		self.logger.debug(f"############################################")
-
 
 	def process_data(self, data, priority):
-		self.logger.debug(f"############################################")
-		self.logger.debug(f"{self.snapeventlist}, {self}")
-		self.logger.debug(f"############################################")
 		if self.snapeventlist is None:
 			self.logger.warning("DL0toDL1 SnapshotEventlist not still configured! Please send configuration file!")
 			raise Exception("DL0toDL1 SnapshotEventlist not still configured! Please send configuration file!")

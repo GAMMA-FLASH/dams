@@ -7,17 +7,22 @@ import traceback
 
 class WorkerDL1toDL2(WorkerBase):
 	def config(self, configuration):
+		# Get pid target
 		pidtarget = configuration['header']['pidtarget']
-		if pidtarget == self.workersname or pidtarget == self.fullname or pidtarget == 'all':
+		# Check if current supervisor is in the pidtarget
+		if pidtarget == self.supervisor.name or pidtarget == "all".lower() or pidtarget == "*":
+			# Get configuration
 			self.config_detector = configuration['config']['config']
+			# Check if it exists the configuration json file
 			if os.path.exists(self.config_detector):
 				print(f"Received config: {configuration}")
+				# Init processing object
 				self.eventlist_dl1 = Eventlist(
 					from_dl1=True,
 					config_detector=self.config_detector, 						# Config file
 					xml_model_path='/home/gamma/workspace/dams/dl1/DL1model.xml'
 				)
-				self.logger.debug(f"DL1toDL2 configured! {self.config_detector}!")
+				self.logger.debug(f"DL1toDL2 configured with - {self.config_detector}!")
 			else:
 				self.logger.warning(f"This configuration file {self.config_detector} for Eventlist doesn't exist!\nPlease provide a valid file!" )
 				raise Exception(f"This configuration file {self.config_detector} for Eventlist doesn't exist!\nPlease provide a valid file!")
