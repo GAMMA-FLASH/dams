@@ -51,7 +51,7 @@ class WorkerDL0toDL2(WorkerBase):
 			# Process DL0 to DL2
 			self.logger.info(f"Starting processing \'{source}\'", extra=self.workersname)
 			try:
-				self.eventlist_dl0.process_file(source, None, dest, startEvent=0, endEvent=-1, pbar_show=True)
+				self.eventlist_dl0.process_file(source, None, dest, startEvent=0, endEvent=-1, pbar_show=False)
 				self.logger.info(f"Processing complete \'{source}\'", extra=self.workersname)
 				# Get filename
 				filename = os.path.basename(source.replace('.h5', '.dl2.h5'))
