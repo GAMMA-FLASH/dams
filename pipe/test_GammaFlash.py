@@ -17,7 +17,7 @@ def start_dl0_publisher(args):
         f"{args.path_dl0}" + f"{'/'+args.acquisition if not args.acquisition is None else ''}", 
         f"{args.path_dl1}" + f"{'/'+args.acquisition if not args.acquisition is None else ''}", 
         f"{args.path_dl2}" + f"{'/'+args.acquisition if not args.acquisition is None else ''}", 
-        args.socket_dl0pub, "3"
+        args.socket_dl0pub, "1"
     ])
 
 ########################################################################################################################
@@ -146,22 +146,25 @@ def send_config(args):
     if not args.detector_config or not args.target_processname:
         print("Error: --detector-config and --target-processname are required for this action.")
         sys.exit(1)
-    subprocess.run([
+    subprocess.Popen([
         "python", "/home/gamma/dependencies/rta-dataprocessor/workers/SendConfig.py",
         f"{args.config_json_path}", "DL0toDL2", f"{args.detector_config}"
-    ])
-    subprocess.run([
+    ]).communicate()
+    time.sleep(1)
+    subprocess.Popen([
         "python", "/home/gamma/dependencies/rta-dataprocessor/workers/SendConfig.py",
         f"{args.config_json_path}", "DL0toDL1", f"{args.detector_config}"
-    ])
-    subprocess.run([
+    ]).communicate()
+    time.sleep(1)
+    subprocess.Popen([
         "python", "/home/gamma/dependencies/rta-dataprocessor/workers/SendConfig.py",
         f"{args.config_json_path}", "DL1toDL2", f"{args.detector_config}"
-    ])
-    subprocess.run([
+    ]).communicate()
+    time.sleep(1)
+    subprocess.Popen([
         "python", "/home/gamma/dependencies/rta-dataprocessor/workers/SendConfig.py",
         f"{args.config_json_path}", "DL2Checker", f"{args.path_out_json}"
-    ])
+    ]).communicate()
 
 ########################################################################################################################
 
@@ -182,13 +185,15 @@ def run_silent_test(args):
         (["python", "test_GammaFlash.py", "-N", "1"], None),
         (["python", "test_GammaFlash.py", "-N", "2"], None),
         (["python", "test_GammaFlash.py", "-N", "3"], None),
-        (["python", "test_GammaFlash.py", "-N", "4"], None),
+        (["python", "test_GammaFlash.py", "-N", "4"], "dl2ck.log"),
         # Sleep di 5 secondi
+        (["python", "/home/gamma/workspace/dams/setup/wait_for_rtadp.py", args.config_json_path, "15", "--extended"], "wait_pipe_start.log"),
+        (["python", "test_GammaFlash.py", "-N", "30", "-o", "/home/gamma/workspace/Out/json", "-d", "/home/gamma/workspace/dams/dl1/detectorconfig_PMT.json", "-t", "all"], "send_config.log"),
+        # Sleep di 5 secondo
         ("sleep 5", None),
-        (["python", "test_GammaFlash.py", "-N", "30", "-o", "/home/gamma/workspace/Out/json", "-d", "/home/gamma/workspace/dams/dl1/detectorconfig_PMT.json"], "send_config.log"),
-        # Sleep di 1 secondo
-        ("sleep 1", None),
         (["python", "test_GammaFlash.py", "-N", "20", "-c", "start", "-t", "all"], "start_command.log"),
+        # Sleep di 5 secondo
+        ("sleep 5", None),
         (["python", "test_GammaFlash.py", "-N", "0", "-acq", args.acquisition], "producer.log"),
     ]
 
@@ -205,7 +210,11 @@ def run_silent_test(args):
         
         # Lancio del comando con subprocess.Popen
         with open(log_path, "w") as log:
-            subprocess.Popen(cmd, stdout=log, stderr=log, shell=False)
+            p = subprocess.Popen(cmd, stdout=log, stderr=log, shell=False)
+            if log_file == "wait_pipe_start.log":
+                print("wait starting services...")
+                p.communicate()
+                print("The whole Pipe si now up! Continue...")
 
     print(f"I test sono stati avviati in background. I log sono salvati in {log_dir}")
     # NOTE: PER TERMINARE TUTTI I PROCESSI USA QUESTO COMANDO:
