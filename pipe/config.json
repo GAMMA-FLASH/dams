@@ -13,10 +13,11 @@
   {
 	"processname": "DL0toDL2",
 	"dataflow_type": "string",
-	"processing_type": "thread",
+	"processing_type": "process",
 	"datasocket_type": "pubsub",
 	"data_lp_socket": "tcp://127.0.0.1:5515",
 	"data_hp_socket": "tcp://127.0.0.1:5516",
+    "data_queue_maxsize": 10000,
 	"command_socket": "tcp://127.0.0.1:5501",
 	"monitoring_socket": "tcp://127.0.0.1:5503",
 	"manager": [
@@ -25,7 +26,7 @@
             "result_dataflow_type": "string",
             "result_lp_socket": "tcp://127.0.0.1:5535",
             "result_hp_socket": "tcp://127.0.0.1:5536",
-            "num_workers": 2,
+            "num_workers": 1,
             "name": "dl0todl2",
             "name_workers": "worker"
         }
@@ -37,10 +38,11 @@
   {
 	"processname": "DL0toDL1",
 	"dataflow_type": "string",
-	"processing_type": "thread",
+	"processing_type": "process",
 	"datasocket_type": "pubsub",
 	"data_lp_socket": "tcp://127.0.0.1:5515",
 	"data_hp_socket": "tcp://127.0.0.1:5516",
+    "data_queue_maxsize": 10000,
 	"command_socket": "tcp://127.0.0.1:5501",
 	"monitoring_socket": "tcp://127.0.0.1:5503",
 	"manager": [
@@ -49,7 +51,7 @@
             "result_dataflow_type": "string",
             "result_lp_socket": "tcp://127.0.0.1:5525",
             "result_hp_socket": "tcp://127.0.0.1:5526",
-            "num_workers": 2,
+            "num_workers": 1,
             "name": "dl0todl1",
             "name_workers": "worker"
         }
@@ -61,10 +63,11 @@
   {
 	"processname": "DL1toDL2",
 	"dataflow_type": "string",
-	"processing_type": "thread",
+	"processing_type": "process",
 	"datasocket_type": "pubsub",
 	"data_lp_socket": "tcp://127.0.0.1:5525",
 	"data_hp_socket": "tcp://127.0.0.1:5526",
+    "data_queue_maxsize": 10000,
 	"command_socket": "tcp://127.0.0.1:5501",
 	"monitoring_socket": "tcp://127.0.0.1:5503",
 	"manager": [
@@ -73,7 +76,7 @@
             "result_dataflow_type": "string",
             "result_lp_socket": "tcp://127.0.0.1:5535",
             "result_hp_socket": "tcp://127.0.0.1:5536",
-            "num_workers": 2,
+            "num_workers": 1,
             "name": "dl1todl2",
             "name_workers": "worker"
         }
@@ -85,10 +88,11 @@
   {
 	"processname": "DL2Checker",
 	"dataflow_type": "string",
-	"processing_type": "thread",
+	"processing_type": "process",
 	"datasocket_type": "pushpull",
 	"data_lp_socket": "tcp://127.0.0.1:5535",
 	"data_hp_socket": "tcp://127.0.0.1:5536",
+    "data_queue_maxsize": 10000,
 	"command_socket": "tcp://127.0.0.1:5501",
 	"monitoring_socket": "tcp://127.0.0.1:5503",
 	"manager": [
@@ -97,7 +101,7 @@
             "result_dataflow_type": "none",
             "result_lp_socket": "none",
             "result_hp_socket": "none",
-            "num_workers": 2,
+            "num_workers": 1,
             "name": "dl2chkr",
             "name_workers": "worker"
         }
