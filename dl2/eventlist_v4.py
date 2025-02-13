@@ -467,13 +467,13 @@ class EventlistDL1(EventlistGeneral):
             arrmov = self.moving_average(arr, mavg_wsize)
             if self.dl1attrs.get_attr(h5file, i, 'n_peaks') == 0:
                 # If in DL1 we didn't find any peak the list should be empty
-                peaks = []
+                peaks = np.array([])
             elif isdoubleEvent:
                 # If it is a double event
                 peaks, _ = find_peaks(arrmov, height=mmean1*2* 0.9, width=findpk_width, distance=findpk_distance)
             else:
                 # If it is a single event event 
-                peaks  = [self.dl1attrs.get_attr(h5file, i, 'peak_pos') - wf_start]
+                peaks  = np.array([self.dl1attrs.get_attr(h5file, i, 'peak_pos') - wf_start])
             # Extract peaks based on moving average and thresholds
             deltav = 20
             peaks2 = np.copy(peaks)

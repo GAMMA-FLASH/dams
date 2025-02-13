@@ -1,575 +1,516 @@
 import os
+import gc
+import signal
 import sys
 import subprocess
 import argparse
 import struct
 import socket
+import threading
 import time
 import math
 from threading import Thread
-from typing import List
+import multiprocessing
+from multiprocessing import JoinableQueue, Process
+from typing import List, Tuple, Type, Union
 from queue import Queue, Full, Empty
 from time import sleep
 import tables as tb
 import numpy as np
 import configparser
-import gc
+import json
+import zmq
+
 from enum import Enum
+import influx_utils as influx
 
 from pathlib import Path
 
-from waveform import Waveform
+from packets import Waveform, Hk, Event
 from crc32 import crc32_fill_table, crc32
 
 # ------------------------------------------------------------------ #
 # Load influx DB modules                                             #
 # ------------------------------------------------------------------ #
-HAS_INFLUX_DB_COUNTS = False
-HAS_INFLUX_DB_HK = False
+
 try:
     from influxdb_client import InfluxDBClient, Point, WriteOptions,WritePrecision
     from influxdb_client.client.write_api import SYNCHRONOUS
     from influxdb_client.rest import ApiException
-    HAS_INFLUX_DB_COUNTS = True
-    HAS_INFLUX_DB_HK = True
+    influx.HAS_INFLUX_DB_COUNTS = True
+    influx.HAS_INFLUX_DB_HK = True
 except ImportError:
     print("Influx modules not found") 
     pass
 
-# ------------------------------------------------------------------ #
-# Global variables                                                   #
-# ------------------------------------------------------------------ #
-INFLUX_DB_URL = None
-INFLUX_DB_TOKEN = None
-INFLUX_DB_ORG = None
-INFLUX_DB_BUCKET = None
-INFLUX_DB_BUCKET_HK = None
-class TimestampOptions(Enum):
-    RedPitaya = 'RP'  # Use tstart from the waveform
-    MainComputer = 'MC'  # Sample the time from the main computer
-INFLUX_WF_TIMESTAMP : TimestampOptions = TimestampOptions.MainComputer
-INFLUX_HK_TIMESTAMP : TimestampOptions = TimestampOptions.MainComputer
-
-def trx_to_str(trx):
-    ts = time.gmtime(trx)
-    str1 = time.strftime("%Y%m%d-%H:%M:%S", ts)
-    sns = math.modf(trx)
-    usec = round(sns[0] * 1e6)
-    str2 = '%06d' % usec
-    return "[Hk - MC time]" + str1 + "." + str2
-
-def tmstp_to_str(tmstp):
-    ts = time.gmtime(tmstp[0])
-    str1 = time.strftime("%Y%m%d-%H:%M:%S", ts)
-    nsec = tmstp[1]
-    str2 = '%06d' % nsec
-    return "[Hk - RP time]" + str1 + "." + str2
-
 print("gc enabled: ", gc.isenabled())
-class Event:
-    def __init__(self,trx=None):
 
-        # Receive time in secs past January 1, 1970, 00:00:00 (UTC)
-        if trx is None:
-            self.trx = time.time()
-        else:
-            self.trx = trx
-
-    def read_data(self, raw):
-        pass
+stopped = multiprocessing.Event()  # Flag per indicare se il processo deve fermarsi
+stop_save = multiprocessing.Event()  # Flag per indicare se il processo deve fermarsi
+use_multiprocessing=False
 
 
-class Hk:
-    def __init__(self, rpId=None):
-        self.rpId = rpId
-        # Receive time in secs past January 1, 1970, 00:00:00 (UTC)
-        
-        self.trx = time.time() #save instantiation time
-        self.tstmp = None
+def conditional_signal_handler(worker_class):
+    if issubclass(worker_class, Process):
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-        self.state = 0
-        self.flags = 0
-        self.wform_count = 0
-        self._point = None
+class BaseWorker:
+    ...
 
-    def read_data(self,raw):
-        # Payload structure
-        # [0] Type (uint8)
-        # [1] SubType (uint8)
-        # [2] State (uint8) 0x02 = SERVICE 0x03 ACQUISITION
-        # [3] Flags (uint8) 0x80 = PPS_NOK 0x40 = GPS_NOK 0x20 = TRIG_ERR (no events)
-        # [4] WaveCount (uint32)
-        # [8] Timestamp (2*uint32)
-        # Add temperature??
-        self.state = struct.unpack('<B', raw[2:3])[0]
-        self.flags = struct.unpack('<B', raw[3:4])[0]
-        self.wform_count = struct.unpack('<I', raw[4:8])[0]
-        if len(raw) > 8:  ##for backward compatibility
+class Recv(BaseWorker):
 
-            self.tstmp = struct.unpack("<LL", raw[8:])  # timespec sec.nsec
-        
-    def compute_time(self):
-        return float(self.tstmp[0]) + float(self.tstmp[1]) * 1e-9
-    
-    def timestamp_found(self):
-        return True if self.tstmp is not None else False
+        def __init__(self, queue, sock, crc_table, rpid):
 
-    def print(self):
-        #print("    State: %02X" % self.state)
-        #print("    Flags: %02X" % self.flags)
-        #print("Wform no.: %d" % self.wform_count)
-        msg = ''
-        if self.tstmp is None:
-            msg = trx_to_str(self.trx)
-        else : 
-            msg = tmstp_to_str(self.tstmp)
-        msg += ' '
-        if self.state == 0x02:
-            msg += 'SRV'
-        elif self.state == 0x03:
-            msg += 'ACQ'
-        else:
-            msg += 'UNK'
-        if self.flags & 0x80:
-            msg += ' P'
-        else:
-            msg += ' _'
-        if self.flags & 0x40:
-            msg += 'Gu'
-        else:
-            msg += '__'
-        if self.flags & 0x20:
-            msg += 'Go'
-        else:
-            msg += '__'
-        if self.flags & 0x10:
-            msg += 'Gt'
-        else:
-            msg += '__'
-        if self.flags & 0x01:
-            msg += 'T'
-        else:
-            msg += '_'
-        msg += ' %5d' % self.wform_count
-        print(msg)
+            super().__init__()
+            self.pid if use_multiprocessing else threading.get_ident()
+            self.queue = queue
+            self.sock = sock
+            self.rpId = rpid
+            self.crc_table = crc_table
+            self.data = bytes()
+            self.pkt_count = 0
+            self.wform_count = 0
+            self.wform_seq_count = 0
+            self.wform = None
 
-    def influx(self, write_api=None, bucket = None, org = None):
-        #print("    State: %02X" % self.state)
-        #print("    Flags: %02X" % self.flags)
-        #print("Wform no.: %d" % self.wform_count)
+        def run(self):
+            conditional_signal_handler(self.__class__)
+            while not stopped.is_set():
+                try:
+                    data = self.sock.recv(65536)
+                except:
+                    print("ERROR: Recv: Socket recv error")
+                    continue
+                try:
+                    self.proc_bytes(data)
+                except:
+                    print("ERROR: Recv: Byte processing error %d" % len(data))
+            print("Recv Exited")
 
-        measurement_name = f"RPG{self.rpId}"
-
-        pps = 1 if self.flags & 0x80 else 0
-        gps_no_uart = 1 if self.flags & 0x40 else 0
-        gps_overtime = 1 if self.flags & 0x20 else 0
-        gps_invalid_time = 1 if self.flags & 0x10 else 0
-        err = 1 if self.flags & 0x01 else 0
-
-        if INFLUX_HK_TIMESTAMP == TimestampOptions.MainComputer:
-            timepoint_influx = math.trunc(self.trx * 1000)
-            write_precision_influx=WritePrecision.MS
-        else:
-            # print("inserintg data")
-
-            timepoint_influx = int(self.tstmp[0]*1e9+self.tstmp[1])
-            write_precision_influx=WritePrecision.NS
-    
-        self._point = (
-            Point(measurement_name)
-            .field("state", self.state)
-            .field("PPS_NOK", pps)
-            .field("GPS_UART_NOK", gps_no_uart)
-            .field("GPS_OVERTIME", gps_overtime)
-            .field("GPS_TIME_NOK", gps_invalid_time)
-            .field("ERR", err)
-            .field("count", self.wform_count)
-            .time(timepoint_influx, write_precision_influx)
-        )
-        
-        try:
-            write_api.write(bucket=bucket, org=org, record=self._point)        
-        except ApiException as e :
-            print(f"API Exception: {e.status} - {e.reason}", file=sys.stderr)
-        except ConnectionError as e :
-            print(f"Connection Error: {e}", file=sys.stderr)
-        except Exception as e :
-            print(f"An unexpected error occurred: {e}", file=sys.stderr)
-
-class RecvThread(Thread):
-
-    def __init__(self, queue, sock, crc_table):
-        Thread.__init__(self)
-        self.queue = queue
-        self.sock = sock
-        self.rpId = sock.getpeername()[0][-1]
-        self.crc_table = crc_table
-        self.data = bytes()
-        self.pkt_count = 0
-        self.wform_count = 0
-        self.wform_seq_count = 0
-        self.wform = None
-        self.running = True
-
-    def run(self):
-        while self.running is True:
-            try:
-                data = self.sock.recv(65536)
-            except:
-                print("ERROR: Recv: Socket recv error")
-                continue
-            try:
-                self.proc_bytes(data)
-            except:
-                print("ERROR: Recv: Byte processing error %d" % len(data))
-
-    def stop(self):
-        self.running = False
-
-    def proc_bytes(self, data):
-        self.data += data
-        off = 0
-        while True:
-            if len(self.data) - off > 0:
-                if self.data[off] == 0x8D:
-                    if len(self.data) - off >= 12:
-                        # [0] Start (uint8)
-                        # [1] APID (uint8)
-                        # [2] Sequence (uint16)
-                        # [3] Run ID (uint16)
-                        # [4] Size (uint16)
-                        # [5] CRC (uint32)
-                        header = struct.unpack("<BBHHHI", self.data[off:off + 12])
-                        data_off = off + 12
-                        if len(self.data) - data_off >= header[4]:
-                            self.decode_pkt(header, self.data[data_off:data_off + header[4]])
-                            off = data_off + header[4]
+        def proc_bytes(self, data):
+            self.data += data
+            off = 0
+            while True:
+                if len(self.data) - off > 0:
+                    if self.data[off] == 0x8D:
+                        if len(self.data) - off >= 12:
+                            # [0] Start (uint8)
+                            # [1] APID (uint8)
+                            # [2] Sequence (uint16)
+                            # [3] Run ID (uint16)
+                            # [4] Size (uint16)
+                            # [5] CRC (uint32)
+                            header = struct.unpack("<BBHHHI", self.data[off:off + 12])
+                            data_off = off + 12
+                            if len(self.data) - data_off >= header[4]:
+                                self.decode_pkt(header, self.data[data_off:data_off + header[4]])
+                                off = data_off + header[4]
+                            else:
+                                self.data = self.data[off:]
+                                break
                         else:
                             self.data = self.data[off:]
                             break
                     else:
-                        self.data = self.data[off:]
-                        break
+                        off += 1
                 else:
-                    off += 1
-            else:
-                self.data = bytes()
-                break
+                    self.data = bytes()
+                    break
 
-    def decode_pkt(self, header, payload):
-        # Check CRC
-        # TODO: check CRC only on wform header/hk/events (??) on wform data only the sequence checking could be enough
-        crc = 0xFFFFFFFF
-        crc = crc32(crc, payload, self.crc_table)
-        # Decode packets
-        if crc == header[5]:
-            if payload[0] == 0x01:  # Event
-                self.decode_event(header, payload)
-            elif payload[0] == 0x03: # HK
-                self.decode_hk(header, payload)
-            elif payload[0] == 0xA1: # Waveform
-                if payload[1] == 0x01: # Waveform header
-                    self.decode_wform_header(header, payload)
-                else: # Waveform data
-                    self.decode_wform_data(header, payload)
-            else:
-                pass
-        else:
-            print("ERROR: Recv: Packet %02X %02X has wrong CRC" % (payload[0], payload[1]))
-
-    def decode_wform_header(self, header, payload):
-        self.wform_seq_count = header[2] & 0x3FFF
-        self.wform = Waveform(rpID=header[1] & 0x7F, runID=header[3])
-        self.wform.read_header(payload)
-
-    def decode_wform_data(self, header, payload):
-        seq_count = header[2] & 0x3FFF
-        self.wform_seq_count += 1
-        if self.wform_seq_count == seq_count:
-            res = self.wform.read_data(payload)
-            if res:
-                self.wform_count += 1
-                try:
-                    self.queue.put(self.wform, timeout=5)
-                except Full:
-                    print("ERROR: Recv: Queue is full")
-                except:
-                    print("ERROR: Recv: Something went wrong in queue put")
-        else:
-            print("ERROR: Recv: Waveform packets sequence error")
-
-    def decode_hk(self, header, payload):
-        #print('Decode HK')
-        hk = Hk(rpId = self.rpId)
-        hk.read_data(payload)
-        try:
-            self.queue.put(hk, timeout=5)
-        except Full:
-            print("ERROR: Recv: Queue is full")
-        except:
-            print("ERROR: Recv: Something went wrong in queue put")
-
-    def decode_event(self, header, payload):
-        #print('Decode event')
-        event = Event()
-        event.read_data(payload)
-        try:
-            self.queue.put(event, timeout=5)
-        except Full:
-            print("ERROR: Recv: Queue is full")
-        except:
-            print("ERROR: Recv: Something went wrong in queue put")
-
-
-class SaveThread(Thread):
-
-    def __init__(self, queue, outdir, wformno, spectrum_cfg):
-        Thread.__init__(self)
-        self.queue = queue
-        self.outdir = outdir
-        self.dl2_dir = self.outdir.replace("DL0","DL2")
-        self.wformno = wformno
-        self.event_list: List[Event] = []
-        self.save_event = False
-        self.hk_list: List[Hk] = []
-        self.save_hk = True
-        self.wform_list: List[Waveform] = []
-        self.wform_count = 0
-        self.running = True
-        self._point = None
-        self.spectrum_cfg = spectrum_cfg
-        self.output_path = None
-        self.file_idx = 0
-        if self.spectrum_cfg['Enable']:
-            try:
-                expanded_process_out_value = os.path.expandvars(self.spectrum_cfg['ProcessOut'])
-                self.output_path = Path(expanded_process_out_value)
-                os.makedirs(self.output_path, exist_ok=True)
-            except TypeError as e:
-                print("WARNING: DL2 output log folder not provided.")
-        # ------------------------------------------------------------------ #
-        # Setup influx DB                                                    #
-        # ------------------------------------------------------------------ #
-
-        if HAS_INFLUX_DB_COUNTS or HAS_INFLUX_DB_HK :
-            self.org = INFLUX_DB_ORG
-            self.client = InfluxDBClient(url=INFLUX_DB_URL, token=INFLUX_DB_TOKEN, org=self.org)
-            if HAS_INFLUX_DB_COUNTS : 
-                self.bucket = INFLUX_DB_BUCKET
-                self.write_api = self.client.write_api(write_options=WriteOptions(batch_size=100,
-                                                      flush_interval=1_000,
-                                                      jitter_interval=2_000,
-                                                      retry_interval=5_000,
-                                                      max_retries=5,
-                                                      max_retry_delay=30_000,
-                                                      exponential_base=2))
-            else:
-                self.bucket = None
-                self.write_api = None
-
-            if HAS_INFLUX_DB_HK :
-                self.write_api_hk = self.client.write_api(write_options=SYNCHRONOUS)
-                self.bucketHk = INFLUX_DB_BUCKET_HK
-            else:
-                self.bucketHk = None
-                self.write_api_hk = None
-
-        else:
-            self.client = None
-            self.write_api = None
-            self.bucket = None
-            self.org = None
-
-    def run(self):
-
-        # Create output directory (if needed)
-        os.makedirs(self.outdir, exist_ok=True)
-
-        while self.running is True or self.queue.qsize() != 0:
-
-            try:
-
-                packet = self.queue.get(timeout=5)
-
-            except Empty:
-                if self.running is True:
-                    print('ERROR: Save: no data')
-                continue
-
-            except:
-                print('ERROR: Save: something went wrong on queue get')
-                sleep(1)
-                continue
-            
-            # Signal that the object has been retrieved
-            self.queue.task_done()
-            
-            if type(packet) is Event:
-                #print('Save event')
-                self.event_list.append(packet)
-            elif type(packet) is Hk:
-                #print('Save HK')
-                packet.print()
-                if HAS_INFLUX_DB_HK:
-                    packet.influx(self.write_api_hk, self.bucketHk, self.org) 
-                self.hk_list.append(packet)
-            else:
-
-                # ------------------------------------------------------------------ #
-                # Send data to influx DB                                             #
-                # ------------------------------------------------------------------ #
-
-                if HAS_INFLUX_DB_COUNTS:
-                
-
-                    if INFLUX_WF_TIMESTAMP == TimestampOptions.RedPitaya: 
-                        time_ms = math.trunc((packet.tstart) * 1000) 
-                    else: 
-                        time_ms = math.trunc(time.time() * 1000) 
-                    rpid = packet.rpID
-                    if self._point is None:
-                        self._point = Point("RPG%1d" % rpid).field("count", 1).time(time_ms, WritePrecision.MS)
-                    else: 
-                        self._point.time(time_ms, WritePrecision.MS)
-                    
-                    try:
-                        self.write_api.write(self.bucket, self.org, record=self._point)
-                    except ApiException as e :
-                        print(f"API Exception: {e.status} - {e.reason}", file=sys.stderr)
-                    except ConnectionError as e :
-                        print(f"Connection Error: {e}", file=sys.stderr)
-                    except Exception as e :
-                        print(f"An unexpected error occurred: {e}", file=sys.stderr)
-
-
-
-
-                self.wform_list.append(packet)
-                self.wform_count += 1
-
-                if self.wform_count == self.wformno :
-
-                    filename = self.dump_packets()
-                                        
-                    if self.spectrum_cfg['Enable']:
-                        self.start_spectrum_an(filename=filename)
-
-                    self.flush_data()
-
+        def decode_pkt(self, header, payload):
+            # Check CRC
+            # TODO: check CRC only on wform header/hk/events (??) on wform data only the sequence checking could be enough
+            crc = 0xFFFFFFFF
+            crc = crc32(crc, payload, self.crc_table)
+            # Decode packets
+            if crc == header[5]:
+                if payload[0] == 0x01:  # Event
+                    self.decode_event(header, payload)
+                elif payload[0] == 0x03: # HK
+                    self.decode_hk(header, payload)
+                elif payload[0] == 0xA1: # Waveform
+                    if payload[1] == 0x01: # Waveform header
+                        self.decode_wform_header(header, payload)
+                    else: # Waveform data
+                        self.decode_wform_data(header, payload)
                 else:
                     pass
+            else:
+                print("ERROR: Recv: Packet %02X %02X has wrong CRC" % (payload[0], payload[1]))
 
-            # if self.wform_count % 10 == 0:
-            #     print(f"DEBUG - Queued packets: {self.queue.qsize()}, processed packets: {self.wform_count}")
+        def decode_wform_header(self, header, payload):
+            self.wform_seq_count = header[2] & 0x3FFF
+            self.wform = Waveform(rpID=header[1] & 0x7F, runID=header[3])
+
+            self.wform.read_header(payload)
+
+        def decode_wform_data(self, header, payload):
+            seq_count = header[2] & 0x3FFF
+            self.wform_seq_count += 1
+            if self.wform_seq_count == seq_count:
+                res = self.wform.read_data(payload)
+                if res:
+                    self.wform_count += 1
+                    try:
+                        self.queue.put(self.wform, timeout=5)
+                    except Full:
+                        print("ERROR: Recv: Queue is full")
+                    except:
+                        print("ERROR: Recv: Something went wrong in queue put")
+            else:
+                print("ERROR: Recv: Waveform packets sequence error")
+
+        def decode_hk(self, header, payload):
+            #print('Decode HK')
+            hk = Hk(rpId = self.rpId)
+            hk.read_data(payload)
+            try:
+                self.queue.put(hk, timeout=5)
+            except Full:
+                print("ERROR: Recv: Queue is full")
+            except:
+                print("ERROR: Recv: Something went wrong in queue put")
+
+        def decode_event(self, header, payload):
+            #print('Decode event')
+            event = Event()
+            event.read_data(payload)
+            try:
+                self.queue.put(event, timeout=5)
+            except Full:
+                print("ERROR: Recv: Queue is full")
+            except:
+                print("ERROR: Recv: Something went wrong in queue put")
+
+class Save(BaseWorker):
+
+        def __init__(self, queue, outdir, wformno, spectrum_cfg, rpid, dl0dl2_pipeline):
+            super().__init__()
+            self.pid if use_multiprocessing else threading.get_ident()
+            self.queue = queue
+            self.rpid_subfolder = f"RPG{rpid}/35mv"
+            self.outdir = f"{outdir}/{self.rpid_subfolder}"
+            self.dl2_dir = self.outdir.replace("DL0","DL2")
+            self.wformno = wformno
+            self.event_list: List[Event] = []
+            self.save_event = False
+            self.hk_list: List[Hk] = []
+            self.save_hk = True
+            self.wform_list: List[Waveform] = []
+            self.wform_count = 0
+            self._point = None
+            self.spectrum_cfg = spectrum_cfg
+            self.dl0dl2_pipeline = dl0dl2_pipeline
+            self.output_path = None
+            self.file_idx = 0
+            self._configure_influxdb()
+            self._configure_spectrum_an()
             
-        if HAS_INFLUX_DB_COUNTS or HAS_INFLUX_DB_HK:
-            if HAS_INFLUX_DB_COUNTS :
-                self.write_api.close()
-            if HAS_INFLUX_DB_HK : 
-                self.write_api_hk.close()
-            self.client.close()
-        
-        if self.wform_count > 0:
-            filename = self.dump_packets()
-                                        
-            if self.spectrum_cfg['Enable']:
-                self.start_spectrum_an(filename=filename)
-        print('Dump queue')
-
-    def stop(self):
-        self.running = False
-
-    def start_spectrum_an(self, filename):
-        inputfile = filename + '.h5'
-        output_log = self.output_path.joinpath(f"{str(Path(filename).name)}.log")
-        
-        cmd=[
-            f"source activate {self.spectrum_cfg['Venv']}",
-            f"python {os.path.expandvars(self.spectrum_cfg['ProcessName'])} --outdir {self.dl2_dir} {self.spectrum_cfg['ProcessArgs']} --filename {inputfile} > {output_log} 2>&1"
-        ]
-        spectrum_cmd = " && ".join(cmd)
-        print("DEBUG - process command: ", spectrum_cmd)
-
-        subprocess.Popen(spectrum_cmd, shell=True)
-
-    def dump_packets(self) -> str:
-        # Note that the time needed to write the data is a function of the number of I/O ops
-        # hence it is more efficient keeping the data into memory list and dump the lists in
-        # one shot
-
-        # print(len(self.event_list))
-        # print(len(self.hk_list))
-        # print(len(self.wform_list))
-
-        # Create the file name using the rx time of the first waveform
-        wf0 = self.wform_list[0]
-        current_time = time.time()
-        str1 = time.strftime("%Y-%m-%dT%H_%M_%S", time.gmtime(current_time))
-        usec = round((current_time - int(current_time)) * 1e6)
-        str2 = '%06d' % usec
-        fname = '%s/wf_runId_%s_file_%s_configId_%s_%s.%s' % (self.outdir, str(wf0.runID).zfill(5), str(self.file_idx).zfill(10), str(wf0.configID).zfill(5), str1, str2)
-        self.file_idx += 1
-        print('Save file: ' + fname + '.h5')
-
-        h5_out = tb.open_file(fname + '.h5', mode='w', title='dl0')
-
-        wform_group = h5_out.create_group('/', 'waveforms', 'waveform information')
-
-        atom = tb.Int16Atom()
-        shape = (16384, 1)
-        filters = tb.Filters(complevel=5, complib='zlib')
-
-        for i, wf in enumerate(self.wform_list):
-            arr = h5_out.create_carray(wform_group, 'wf_%s' % str(i).zfill(6), atom, shape, f'wf{i}', filters=filters)
-            arr._v_attrs.VERSION = '2.0'
-            arr._v_attrs.rp_id = wf.rpID
-            arr._v_attrs.runid = wf.runID
-            arr._v_attrs.sessionID = wf.sessionID
-            arr._v_attrs.configID = wf.configID
-            arr._v_attrs.TimeSts = wf.timeSts
-            arr._v_attrs.PPSSliceNO = wf.ppsSliceNo
-            arr._v_attrs.Year = wf.year
-            arr._v_attrs.Month = wf.month
-            arr._v_attrs.Day = wf.day
-            arr._v_attrs.HH = wf.hh
-            arr._v_attrs.mm = wf.mm
-            arr._v_attrs.ss = wf.ss
-            arr._v_attrs.usec = wf.usec
-            arr._v_attrs.Eql = wf.eql
-            arr._v_attrs.Dec = wf.dec
-            arr._v_attrs.CurrentOffset = wf.curr_off
-            arr._v_attrs.TriggerOffset = wf.trig_off
-            arr._v_attrs.SampleNo = wf.sample_no
-            arr._v_attrs.tstart = wf.tstart
-            arr._v_attrs.tend = wf.tstop
-            arr[:16384] = np.transpose(np.array([wf.sigr.astype(np.int16)*-1]))[:16384]
-
-        if self.save_hk:
-
-            hk_group = h5_out.create_group('/', 'hk', 'hk information')
-
-            shape = (1, 1)
-            for i, hk in enumerate(self.hk_list):
-                arr = h5_out.create_carray(hk_group, 'hk_%s' % str(i).zfill(6), atom, shape, f'hk{i}', filters=filters)
-                arr._v_attrs.state = hk.state
-                arr._v_attrs.flags = hk.flags
-                arr._v_attrs.wform_count = hk.wform_count
-                if hk.timestamp_found():
-                    arr._v_attrs.time = hk.compute_time()
-                arr[:] = 0
-
-        h5_out.close()
-        # Create the OK file
-        ok_out = open(fname + '.h5.ok', 'w')
-        ok_out.close()
-
-        return fname
+        def _configure_influxdb(self):
+            # ------------------------------------------------------------------ #
+            # Setup influx DB                                                    #
+            # ------------------------------------------------------------------ #
     
-    def flush_data(self):
-        self.event_list = []
-        self.hk_list = []
-        self.wform_list = []
-        self.wform_count = 0
+            if influx.HAS_INFLUX_DB_COUNTS or influx.HAS_INFLUX_DB_HK :
+                self.org = influx.INFLUX_DB_ORG
+                self.client = InfluxDBClient(url=influx.INFLUX_DB_URL, token=influx.INFLUX_DB_TOKEN, org=self.org)
+                if influx.HAS_INFLUX_DB_COUNTS : 
+                    self.bucket = influx.INFLUX_DB_BUCKET
+                    self.write_api = self.client.write_api(write_options=WriteOptions(batch_size=100,
+                                                        flush_interval=1_000,
+                                                        jitter_interval=2_000,
+                                                        retry_interval=5_000,
+                                                        max_retries=5,
+                                                        max_retry_delay=30_000,
+                                                        exponential_base=2))
+                else:
+                    self.bucket = None
+                    self.write_api = None
+
+                if influx.HAS_INFLUX_DB_HK :
+                    self.write_api_hk = self.client.write_api(write_options=SYNCHRONOUS)
+                    self.bucketHk = influx.INFLUX_DB_BUCKET_HK
+                else:
+                    self.bucketHk = None
+                    self.write_api_hk = None
+                print("SAVE-Influxdb configured")
+
+            else:
+                self.client = None
+                self.write_api = None
+                self.bucket = None
+                self.org = None
+
+        def _configure_spectrum_an(self):
+            # ------------------------------------------------------------------ #
+            # Setup spectrum analysis (DL2 via eventlistv4)                      #
+            # ------------------------------------------------------------------ #
+    
+            if self.spectrum_cfg['Enable']:
+                try:
+                    expanded_process_out_value = os.path.expandvars(self.spectrum_cfg['ProcessOut'])
+                    self.output_path = Path(expanded_process_out_value)
+                    os.makedirs(self.output_path, exist_ok=True)
+                    print("SAVE-spectrum analysis configured")
+                except TypeError as e:
+                    print("WARNING: DL2 output log folder not provided.")
+
+        def _configure_rtadp(self):
+            # ------------------------------------------------------------------ #
+            # Setup rta-dp (DL1-DL2 production)                                  #
+            # ------------------------------------------------------------------ #
+            if self.dl0dl2_pipeline['Enable']:
+                
+                from ConfigurationManager import ConfigurationManager
+                self.context = zmq.Context()
+                cfgman= ConfigurationManager(self.dl0dl2_pipeline['json_data'])
+                socketto_san=cfgman.get_configuration("DL0toDL1")["data_lp_socket"]
+                print("----------->", socketto_san)
+                self.socket_rtadp=self.context.socket(zmq.PUSH)
+                try:
+                    self.socket_rtadp.connect(socketto_san)
+                    print("SAVE- Connected to : ", self.socket_rtadp)
+                    print("SAVE- RTADP enabled")
+                except Exception as e:
+                    self.dl0dl2_pipeline['Enable'] = False
+                    print(f"ERROR: cannot connect to rtadp. Reason: {e}")
+            
+            else: 
+                self.socket_rtadp=None
+
+        def _close_rtadp_connection(self):
+            if self.dl0dl2_pipeline['Enable']:
+                self.socket_rtadp.setsockopt(zmq.LINGER, 0)  # Imposta la chiusura immediata
+                self.socket_rtadp.close()
+                self.context.destroy()
+                print("SAVE- RTADP connection closed")
+
+        def run(self):
+            self._configure_rtadp()
+            conditional_signal_handler(self.__class__)
+            # Create output directory (if needed)
+            os.makedirs(self.outdir, exist_ok=True)
+
+            while not stop_save.is_set() or self.queue.qsize() != 0:
+
+                try:
+
+                    packet = self.queue.get(timeout=5)
+
+                except Empty:
+                    if not stopped.is_set():
+                        print('ERROR: Save: no data')
+                    continue
+
+                except:
+                    print('ERROR: Save: something went wrong on queue get')
+                    sleep(1)
+                    continue
+                
+                # Signal that the object has been retrieved
+                self.queue.task_done()
+                
+                if type(packet) is Event:
+                    #print('Save event')
+                    self.event_list.append(packet)
+                elif type(packet) is Hk:
+                    #print('Save HK')
+                    packet.print()
+                    if influx.HAS_INFLUX_DB_HK:
+                        packet.influx(self.write_api_hk, self.bucketHk, self.org) 
+                    self.hk_list.append(packet)
+                else:
+
+                    # ------------------------------------------------------------------ #
+                    # Send data to influx DB                                             #
+                    # ------------------------------------------------------------------ #
+
+                    if influx.HAS_INFLUX_DB_COUNTS:
+                    
+
+                        if influx.INFLUX_WF_TIMESTAMP == influx.TimestampOptions.RedPitaya: 
+                            time_ms = math.trunc((packet.tstart) * 1000) 
+                        else: 
+                            time_ms = math.trunc(time.time() * 1000) 
+                        rpid = packet.rpID
+                        rpgid_folder_name = "RPG%1d" % rpid
+                        print(f"INFO -- {rpid}")
+                        if self._point is None:
+                            self._point = Point("RPG%1d" % rpid).field("count", 1).time(time_ms, WritePrecision.MS)
+                        else: 
+                            self._point.time(time_ms, WritePrecision.MS)
+                        
+                        try:
+                            self.write_api.write(self.bucket, self.org, record=self._point)
+                        except ApiException as e :
+                            print(f"API Exception: {e.status} - {e.reason}", file=sys.stderr)
+                        except ConnectionError as e :
+                            print(f"Connection Error: {e}", file=sys.stderr)
+                        except Exception as e :
+                            print(f"An unexpected error occurred: {e}", file=sys.stderr)
+
+
+
+
+                    self.wform_list.append(packet)
+                    self.wform_count += 1
+
+                    if self.wform_count == self.wformno :
+
+                        filename = self.dump_packets()
+                                            
+                        if self.spectrum_cfg['Enable']:
+                            self.start_spectrum_an(filename=filename)
+                        if self.dl0dl2_pipeline['Enable']:
+                            self.send_rtadp_filename_spectrum_an(filename=filename)
+
+                        self.flush_data()
+
+                    else:
+                        pass
+
+                # if self.wform_count % 10 == 0:
+                #     print(f"DEBUG - Queued packets: {self.queue.qsize()}, processed packets: {self.wform_count}")
+                
+            if influx.HAS_INFLUX_DB_COUNTS or influx.HAS_INFLUX_DB_HK:
+                if influx.HAS_INFLUX_DB_COUNTS :
+                    self.write_api.close()
+                if influx.HAS_INFLUX_DB_HK : 
+                    self.write_api_hk.close()
+                self.client.close()
+            
+            if self.wform_count > 0:
+                filename = self.dump_packets()
+                                            
+                if self.spectrum_cfg['Enable']:
+                    self.start_spectrum_an(filename=filename)
+                if self.dl0dl2_pipeline['Enable']:
+                    self.send_rtadp_filename_spectrum_an(filename=filename)
+            print('Dump queue')
+            self._close_rtadp_connection()
+
+        def start_spectrum_an(self, filename):
+            inputfile = filename + '.h5'
+            output_log = self.output_path.joinpath(f"{str(Path(filename).name)}.log")
+            
+            cmd=[
+                f"source activate {self.spectrum_cfg['Venv']}",
+                f"python {os.path.expandvars(self.spectrum_cfg['ProcessName'])} --outdir {self.dl2_dir} {self.spectrum_cfg['ProcessArgs']} --filename {inputfile} > {output_log} 2>&1"
+            ]
+            spectrum_cmd = " && ".join(cmd)
+            print("DEBUG - process command: ", spectrum_cmd)
+
+            subprocess.Popen(spectrum_cmd, shell=True)
+
+        def send_rtadp_filename_spectrum_an(self, filename):
+            inputfile = filename + '.h5'
+            # output_log = self.output_path.joinpath(f"{str(Path(filename).name)}.log")
+            
+            # cmd=[
+            #     f"source activate {self.spectrum_cfg['Venv']}",
+            #     f"python {os.path.expandvars(self.spectrum_cfg['ProcessName'])} --outdir {self.dl2_dir} {self.spectrum_cfg['ProcessArgs']} --filename {inputfile} > {output_log} 2>&1"
+            # ]
+            # spectrum_cmd = " && ".join(cmd)
+            # print("DEBUG - process command: ", spectrum_cmd)
+            data = {"path_dl0_folder": self.outdir, 
+                    "path_dl1_folder": self.dl0dl2_pipeline['dl1_dir']+f"/{self.rpid_subfolder}", 
+                    "path_dl2_folder": self.dl0dl2_pipeline['dl2_dir']+f"/{self.rpid_subfolder}", 
+                    "filename":        os.path.basename(inputfile)}
+            # Dump message
+            message = json.dumps(data)
+            self.socket_rtadp.send_string(message)
+            print("DEBUG - data sent: ", data)
+            # subprocess.Popen(spectrum_cmd, shell=True)s
+
+        def dump_packets(self) -> str:
+            # Note that the time needed to write the data is a function of the number of I/O ops
+            # hence it is more efficient keeping the data into memory list and dump the lists in
+            # one shot
+
+            # print(len(self.event_list))
+            # print(len(self.hk_list))
+            # print(len(self.wform_list))
+
+            # Create the file name using the rx time of the first waveform
+            wf0 = self.wform_list[0]
+            current_time = time.time()
+            str1 = time.strftime("%Y-%m-%dT%H_%M_%S", time.gmtime(current_time))
+            usec = round((current_time - int(current_time)) * 1e6)
+            str2 = '%06d' % usec
+            fname = '%s/wf_runId_%s_file_%s_configId_%s_%s.%s' % (self.outdir, str(wf0.runID).zfill(5), str(self.file_idx).zfill(10), str(wf0.configID).zfill(5), str1, str2)
+            self.file_idx += 1
+            print('Save file: ' + fname + '.h5')
+
+            h5_out = tb.open_file(fname + '.h5', mode='w', title='dl0')
+
+            wform_group = h5_out.create_group('/', 'waveforms', 'waveform information')
+
+            atom = tb.Int16Atom()
+            shape = (16384, 1)
+            filters = tb.Filters(complevel=5, complib='zlib')
+
+            for i, wf in enumerate(self.wform_list):
+                arr = h5_out.create_carray(wform_group, 'wf_%s' % str(i).zfill(6), atom, shape, f'wf{i}', filters=filters)
+                arr._v_attrs.VERSION = '2.0'
+                arr._v_attrs.rp_id = wf.rpID
+                arr._v_attrs.runid = wf.runID
+                arr._v_attrs.sessionID = wf.sessionID
+                arr._v_attrs.configID = wf.configID
+                arr._v_attrs.TimeSts = wf.timeSts
+                arr._v_attrs.PPSSliceNO = wf.ppsSliceNo
+                arr._v_attrs.Year = wf.year
+                arr._v_attrs.Month = wf.month
+                arr._v_attrs.Day = wf.day
+                arr._v_attrs.HH = wf.hh
+                arr._v_attrs.mm = wf.mm
+                arr._v_attrs.ss = wf.ss
+                arr._v_attrs.usec = wf.usec
+                arr._v_attrs.Eql = wf.eql
+                arr._v_attrs.Dec = wf.dec
+                arr._v_attrs.CurrentOffset = wf.curr_off
+                arr._v_attrs.TriggerOffset = wf.trig_off
+                arr._v_attrs.SampleNo = wf.sample_no
+                arr._v_attrs.tstart = wf.tstart
+                arr._v_attrs.tend = wf.tstop
+                arr[:16384] = np.transpose(np.array([wf.sigr.astype(np.int16)]))[:16384]
+
+            if self.save_hk:
+
+                hk_group = h5_out.create_group('/', 'hk', 'hk information')
+
+                shape = (1, 1)
+                for i, hk in enumerate(self.hk_list):
+                    arr = h5_out.create_carray(hk_group, 'hk_%s' % str(i).zfill(6), atom, shape, f'hk{i}', filters=filters)
+                    arr._v_attrs.state = hk.state
+                    arr._v_attrs.flags = hk.flags
+                    arr._v_attrs.wform_count = hk.wform_count
+                    if hk.timestamp_found():
+                        arr._v_attrs.time = hk.compute_time()
+                    arr[:] = 0
+
+            h5_out.close()
+            # Create the OK file
+            # if self.dl0dl2_pipeline['Enable']:
+            #     ok_out = open(fname + '.h5.ok', 'w')
+            #     ok_out.close()
+
+            return fname
+        
+        def flush_data(self):
+            self.event_list = []
+            self.hk_list = []
+            self.wform_list = []
+            self.wform_count = 0
+
+def create_dynamic_classes(use_multiprocessing: bool) -> Tuple[Type[Union[Process, Thread]], Type[Union[Process, Thread]]]:
+    """Crea due classi dinamiche che estendono `multiprocessing.Process` o `threading.Thread`."""
+    base_class = Process if use_multiprocessing else Thread
+
+    # Sostituzione della classe base
+    Recv.__bases__ = (base_class,)
+    Save.__bases__ = (base_class,)
+
+    return Recv, Save
 
 def start_acquisition(sock, crc_table):
 
@@ -592,28 +533,35 @@ def start_acquisition(sock, crc_table):
     sock.send(header + data)
 
 
+def signal_handler(sig, frame):
+    pid = os.getpid()  # Ottieni il PID del processo corrente
+    print(f"[Main] Caught SIGINT in process {pid}, initiating shutdown...")
+    stopped.set()  # Imposta il flag per fermare i processi
+
+
 DESCRIPTION = 'GammaFlash client v2.0.1'
 
 
 if __name__ == '__main__':
-
     # ----------------------------------
     # Parse inputs
     # ----------------------------------
 
     # Configure input arguments
     parser = argparse.ArgumentParser(prog='gfcl', description=DESCRIPTION)
+    parser.add_argument('--rpid', type=str, help='The Redpitaya Identifier in the .cfg file', required=True)
     parser.add_argument('--addr', type=str, help='The Redpitaya IP address', required=True)
     parser.add_argument('--port', type=int, help='The Redpitaya port', required=True)
     parser.add_argument('--outdir', type=str, help='Output Directory', required=True)
     parser.add_argument('--wformno', type=int, help='Waveforms contained in HDF5 file', required=True)
+    parser.add_argument('--multiprocessing', action='store_true', help='if present, enable multiprocessing')
 
     # Parse arguments and stop in case of help
     args = parser.parse_args(sys.argv[1:])
 
     print(DESCRIPTION)
 
-    if not HAS_INFLUX_DB_HK or not HAS_INFLUX_DB_COUNTS:
+    if not influx.HAS_INFLUX_DB_HK or not influx.HAS_INFLUX_DB_COUNTS:
         print("INFO: Main: No influx DB module found")
 
     # ----------------------------------
@@ -621,32 +569,7 @@ if __name__ == '__main__':
     # ----------------------------------
     cfg = configparser.ConfigParser()
     cfg.read('gfcl.ini')
-    if HAS_INFLUX_DB_HK or HAS_INFLUX_DB_COUNTS:
-        if cfg['INFLUXDB'].getboolean('Enable_Counts') or cfg['INFLUXDB'].getboolean('Enable_Hk'):
-            print("INFO: Main: load influx DB connection pramaters")
-            INFLUX_DB_URL = cfg['INFLUXDB'].get("URL")
-            INFLUX_DB_TOKEN = cfg['INFLUXDB'].get("Token")
-            INFLUX_DB_ORG = cfg['INFLUXDB'].get("Org")
-            if cfg['INFLUXDB'].getboolean('Enable_Counts') :
-                print("Counts enabled")
-                INFLUX_DB_BUCKET = cfg['INFLUXDB'].get("Bucket")
-            else: 
-                HAS_INFLUX_DB_COUNTS = False
-            if cfg['INFLUXDB'].getboolean('Enable_Hk') :
-                print("Housekeeping enabled")
-                INFLUX_DB_BUCKET_HK = cfg['INFLUXDB'].get("BucketHk")
-            else:
-                HAS_INFLUX_DB_HK = False
-            try:
-                INFLUX_WF_TIMESTAMP = TimestampOptions(cfg['INFLUXDB'].get("Timestamp_Wf"))
-                print(f"Timestamp to load to influx set to: {INFLUX_WF_TIMESTAMP}")
-                INFLUX_HK_TIMESTAMP = TimestampOptions(cfg['INFLUXDB'].get("Timestamp_Hk"))
-                print(f"Timestamp to load to influx set to: {INFLUX_HK_TIMESTAMP}")
-            except ValueError as e:
-                print(f"WARNING: Cannot set 'TIMESTAMP' option: {e}. Using default value {TimestampOptions.MainComputer}")
-        else:
-            HAS_INFLUX_DB_HK = False
-            HAS_INFLUX_DB_COUNTS = False
+    influx.parse_influx_params(cfg)
     
     spectrum_cfg={
             'Enable' : cfg['SPECTRUM_AN'].getboolean('Enable'),
@@ -654,6 +577,13 @@ if __name__ == '__main__':
             'ProcessName' : cfg['SPECTRUM_AN'].get('ProcessName'),
             'ProcessArgs' : cfg['SPECTRUM_AN'].get('ProcessArgs'),
             'ProcessOut' : cfg['SPECTRUM_AN'].get('ProcessOut')
+            }
+
+    dl0dl2_pipeline={
+            'Enable' : cfg['DL0DL2_PIPE'].getboolean('Enable'), 
+            'json_data': os.getenv(cfg['DL0DL2_PIPE'].get('RTADPCONFIG_VAR')),
+            'dl1_dir': os.getenv(cfg['DL0DL2_PIPE'].get('RTADPDL1OUT_VAR')),
+            'dl2_dir': os.getenv(cfg['DL0DL2_PIPE'].get('RTADPDL2OUT_VAR')),
             }
 
     # ----------------------------------
@@ -675,10 +605,29 @@ if __name__ == '__main__':
     # ----------------------------------
     # Start client
     # ----------------------------------
+    
+    chosen_queue_type : Union[JoinableQueue, Queue]= None
 
-    queue = Queue(args.wformno)
+    if args.multiprocessing : 
+        use_multiprocessing = True
+        chosen_queue_type = JoinableQueue
+    else: 
+        chosen_queue_type = Queue
+        
+    queue = chosen_queue_type(args.wformno)
 
-    save_thread = SaveThread(queue, args.outdir, args.wformno, spectrum_cfg)
+    Dyn_Recv , Dyn_Save = create_dynamic_classes(use_multiprocessing=use_multiprocessing)
+
+    
+    print(f"Chosen queue type: {chosen_queue_type.__name__}")
+    print(f"Base class of RecvClass: {Dyn_Recv.__bases__[0].__name__}")
+    print(f"Base class of SaveClass: {Dyn_Save.__bases__[0].__name__}")
+
+    # Adapt signal handling to multiprocessing
+
+    signal.signal(signal.SIGINT, signal_handler)
+
+    save_thread : Union[Process, Thread] = Dyn_Save(queue, args.outdir, args.wformno, spectrum_cfg, args.rpid, dl0dl2_pipeline)
     save_thread.start()
 
     sleep(1)
@@ -686,7 +635,7 @@ if __name__ == '__main__':
     # Create CRC table
     crc_table = crc32_fill_table(0x05D7B3A1)
 
-    recv_thread = RecvThread(queue, sock, crc_table)
+    recv_thread : Union[Process, Thread] = Dyn_Recv( queue, sock, crc_table, args.rpid)
     recv_thread.start()
 
     # ----------------------------------
@@ -702,26 +651,20 @@ if __name__ == '__main__':
     # ----------------------------------
     # Monitor loop
     # ----------------------------------
-    while True:
-        try:
-            #print("INFO: Main: Running ")
-            sleep(5)
-        except KeyboardInterrupt:
-            break
+    while not stopped.is_set():
+        sleep(5)
 
     # ----------------------------------
     # Ordered shutdown
     # ----------------------------------
 
     print('INFO: Main: Stop recv thread')
-    recv_thread.stop()
     recv_thread.join()
 
     print('INFO: Main: Wait till data saving is complete')
     queue.join()
-
+    stop_save.set()
     print('INFO: Main: Stop save thread')
-    save_thread.stop()
     save_thread.join()
 
     print('End')

@@ -1,0 +1,21 @@
+{
+    "xlen": 16384,
+    "saturationValue": 8192,
+    "mavg_wsize": 15,
+    "bkgbaselev_size": 100, 
+    "findpk_distance":25, 
+    "findpk_width":15, 
+    "blocks_size": 25,
+    "thr_heur": 80,
+    "thr_end_wf": 16000,
+    
+    "arr_bias": 0,
+    "deltav": 20,
+    
+    "deltac_sx": 150,
+    "deltac_dx": 1000,
+    
+    "blocksSize_dblEvent": 30,
+    "blocksSize_endindex": 100,
+    "default_endindex": 1500
+    }

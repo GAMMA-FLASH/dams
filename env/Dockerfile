@@ -1,11 +1,14 @@
-FROM oraclelinux:8 AS oracle8
+ARG BASE_IMAGE=dams_base:latest
+
+FROM oraclelinux:8 AS base
 
 # ---------------------------------- Installing dependencies as root ---------------------------------- 
+RUN dnf update
 RUN dnf install -y epel-release git cmake3 gcc-c++ gcc binutils \
 compat-openssl10 libX11-devel libXpm-devel libXft-devel libXext-devel \ 
 gsl-devel openssl-devel wget bzip2-devel libffi-devel xz-devel sqlite-devel \
 ncurses ncurses-devel make xz libzstd libzstd-devel which rsync \
-nmap-ncat chrony
+nmap-ncat chrony lsof net-tools 
 
 RUN dnf install -y oracle-epel-release-el8
 RUN dnf config-manager --enable ol8_codeready_builder
@@ -13,7 +16,7 @@ RUN dnf install -y hdf5 hdf5-devel
 
 # ---------------------------------- Create Gamma user ---------------------------------- 
 USER root 
-RUN useradd gamma
+RUN useradd gamma && chown -R gamma:gamma /home/gamma
 USER gamma
 WORKDIR /home/gamma
 RUN mkdir -p /home/gamma/dependencies
@@ -51,7 +54,7 @@ RUN ARCH=$(uname -m) &&                                         \
 WORKDIR /home/gamma
 RUN chown -R gamma:gamma /home/gamma/
 
-RUN mkdir -p /home/gamma//dependencies/gamma-env 
+RUN mkdir -p /home/gamma/dependencies/gamma-env 
 COPY conda/environment.yml /home/gamma/dependencies/gamma-env
 #COPY venv/$REQUIREMENTS gamma-env
 
@@ -62,13 +65,12 @@ RUN export PATH=$PATH:/opt/conda/bin && conda config --append channels conda-for
 RUN export PATH=$PATH:/opt/conda/bin && source activate gammaenv && cd /home/gamma/dependencies/gamma-env && pip3 install -r /home/gamma/dependencies/gamma-env/requirements.txt
 
 # ---------------------------------- Install RTA-DATAPROCESSOR ---------------------------------- 
-RUN git clone https://github.com/ASTRO-EDU/rta-dataprocessor.git && \
-    mv /home/gamma/rta-dataprocessor /home/gamma/dependencies/rta-dataprocessor 
+RUN git clone https://github.com/ASTRO-EDU/rta-dataprocessor.git /home/gamma/dependencies/rta-dataprocessor 
 
 USER root
 RUN  mkdir /home/gamma/workspace &&   \
-     mkdir /home/gamma/workspace/Data 
-RUN chown -R gamma:gamma /home/gamma/workspace/Data
+     mkdir /home/gamma/workspace/Data && \
+     chown -R gamma:gamma /home/gamma/workspace
 COPY ./entrypoint.sh /home/gamma/entrypoint.sh
 
 RUN chmod +x /home/gamma/entrypoint.sh
@@ -85,3 +87,26 @@ ENV PYTHONPATH="${PYTHONPATH}:/home/gamma/workspace/dams/pipe"
 # ENTRYPOINT ["/bin/bash", "-c", "source /home/gamma/entrypoint.sh && exec bash"]
 # CMD ["/bin/bash", "-c", "source /home/gamma/entrypoint.sh && exec bash"]
 RUN echo "source /opt/conda/bin/activate gammaenv" >> /home/gamma/.bashrc
+
+
+FROM ${BASE_IMAGE} AS prod
+
+USER gamma
+
+
+ARG REPO_BRANCH=main
+ARG REPO_SRC=https://github.com/GAMMA-FLASH/dams.git
+ARG CACHE_BUSTER=1  # Cambia il valore di CACHE_BUSTER per invalidare
+ENV DAMS=/home/gamma/workspace/dams
+ENV RPG_CONFIG=/home/gamma/workspace/dams/setup/testlab
+
+RUN git clone --recurse-submodules --branch ${REPO_BRANCH} ${REPO_SRC} /home/gamma/workspace/dams && \
+    ln -s $DAMS/setup/testlab/host3/gfcl.ini.host3> $DAMS/dl0/gfcl.ini
+
+WORKDIR /home/gamma/workspace/dams
+
+RUN mkdir /home/gamma/.ssh && chmod 700 /home/gamma/.ssh
+
+ENTRYPOINT /home/gamma/workspace/dams/env/entrypoint.sh
+
+

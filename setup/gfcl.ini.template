@@ -1,0 +1,31 @@
+[DEFAULT]
+Test = no
+
+[INFLUXDB]
+# char '|' represents 'OR': mutually exclusive values. Choose only one.
+Enable_Counts = yes|no
+Enable_Hk = yes|no
+# influxDB server connection must be entered here.
+URL = ip:port
+Token = 
+Org = GAMMA-SKY
+Bucket = RP-COUNTS
+BucketHk = HK
+# Determine the timestamp used to create the point in the InfluxDB. Options: 'RP' to use tstart from the waveform. 'MC' to sample the time from main computer.
+Timestamp_Wf = MC|RP 
+Timestamp_Hk = MC|RP
+
+[SPECTRUM_AN]
+Enable = yes|no
+Venv = gammaflash
+ProcessName = /path/to/dams/dl2/eventlist_v4.py
+ProcessArgs =  
+ProcessOut = /path/to/logs/folder
+
+[DL0DL2_PIPE]
+Enable = yes|no
+RTADPCONFIG_VAR = RTADP_JSON_PATH
+RTADPDL1OUT_VAR = DL1DIR
+RTADPDL2OUT_VAR = DL2DIR
+
+

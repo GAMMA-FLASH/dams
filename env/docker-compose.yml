@@ -1,0 +1,22 @@
+services:
+  base:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: base
+    image: dams_base:${BASE_TAG:-1.6.0} # Usa BASE_TAG per configurare il tag
+
+  prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: prod
+      args:
+        - BASE_IMAGE=dams_base:${BASE_TAG:-1.6.0}
+        - REPO_BRANCH=${REPO_BRANCH:-dev_kernel2}
+        - CACHE_BUSTER=${CACHE_BUSTER:-1}
+    depends_on:
+      - base
+    image: dams_prod:${REPO_BRANCH:-latest}
+
+

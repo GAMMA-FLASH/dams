@@ -73,7 +73,7 @@ if __name__ == "__main__":
     path_dl0, path_dl1, path_dl2 = sys.argv[1], sys.argv[2], sys.argv[3] 
     # Get the socket name where publishing the file name to process from DL0 to DL2
     socketstring = sys.argv[4]
-    countdown=10
+    countdown=0
     for i in range(countdown):
         print(f"{countdown-i}")
         time.sleep(1)

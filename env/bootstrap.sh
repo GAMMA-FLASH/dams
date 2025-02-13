@@ -20,8 +20,8 @@ else
         - <<EOF
 FROM ${INTERMEDIATE_TAG}
 USER root
-RUN usermod -u "${MY_UID}" usergamma && groupmod -g "${MY_GID}" usergamma
-USER usergamma
+RUN usermod -u "${MY_UID}" gamma && groupmod -g "${MY_GID}" gamma
+USER gamma
 EOF
     docker rmi $INTERMEDIATE_TAG
 fi

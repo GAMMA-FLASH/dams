@@ -1,0 +1,29 @@
+[DEFAULT]
+Test = no
+
+[INFLUXDB]
+Enable_Counts = no
+Enable_Hk = yes
+URL = 172.17.0.1:7804
+Token = LAEwTJwgWsPuv4YP00KRcw9iRhis3vzK8agBjn0OhZqqpmxEFjT7RlWCcHszqG7m_8gCnTNasxqlzE1WUm-Wgg==
+Org = GAMMA-SKY
+Bucket = RP-COUNTS
+BucketHk = HK
+# Determine the timestamp used to create the point in the InfluxDB. Options: 'RP' to use tstart from the waveform. 'MC' to sample the time from main computer.
+Timestamp_Wf = MC 
+Timestamp_Hk = RP
+
+[SPECTRUM_AN]
+Enable = no
+Venv = gammaflash
+ProcessName = /home/gamma/workspace/dams/dl2/eventlist_v4.py
+ProcessArgs =  
+ProcessOut = /home/gamma/logs
+
+[DL0DL2_PIPE]
+Enable = yes
+RTADPCONFIG_VAR = RTADP_JSON_PATH
+RTADPDL1OUT_VAR = DL1DIR
+RTADPDL2OUT_VAR = DL2DIR
+
+

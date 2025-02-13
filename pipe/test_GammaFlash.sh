@@ -11,8 +11,8 @@ if [ "$#" -eq 0 ]; then
     exit 0
 fi
 
-path_dl0='/home/gamma/workspace/Data/DL0' 
-path_dl1='/home/gamma/workspace/Data/DL1' 
+path_dl0='/home/gamma/workspace/Data/tmpscratch/DL0' 
+path_dl1='/home/gamma/workspace/Data/tmpscratch/DL1' 
 path_dl2='/home/gamma/workspace/Data/DL2' 
 path_json_result='/home/gamma/workspace/Data/Out/json'
 socket='tcp://localhost:5555'
@@ -27,15 +27,15 @@ if [ $arg -eq 0 ]; then
 elif [ $arg -eq 1 ]; then
     echo ========= START DL0toDL2__service ========
     rm -rf $path_dl2/*
-    python -c "from DL0toDL2__service.Supervisor_dl0todl2 import Supervisor_DL0toDL2; Supervisor_DL0toDL2('$json_path', 'DL0toDL2').start()"
+    python -c "from DL0toDL2__service.Supervisor_dl0todl2 import Supervisor_DL0toDL2; Supervisor_DL0toDL2('$json_path', 'DL0toDL2')"
 elif [ $arg -eq 2 ]; then
     echo ========= START DL0toDL1__service ========
     rm -rf $path_dl1/*
-    python -c "from DL0toDL1__service.Supervisor_dl0todl1 import Supervisor_DL0toDL1; Supervisor_DL0toDL1('${json_path}', 'DL0toDL1').start()"
+    python -c "from DL0toDL1__service.Supervisor_dl0todl1 import Supervisor_DL0toDL1; Supervisor_DL0toDL1('${json_path}', 'DL0toDL1')"
 elif [ $arg -eq 3 ]; then
     echo ========= START DL1toDL2__service ========
     rm -rf $path_dl2/*
-    python -c "from DL1toDL2__service.Supervisor_dl1todl2 import Supervisor_DL1toDL2; Supervisor_DL1toDL2('${json_path}', 'DL1toDL2').start()"
+    python -c "from DL1toDL2__service.Supervisor_dl1todl2 import Supervisor_DL1toDL2; Supervisor_DL1toDL2('${json_path}', 'DL1toDL2')"
 elif [ $arg -eq 4 ]; then
     echo ========= START DL2Checker ========
     rm -rf $path_json_result/*

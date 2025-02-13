@@ -4,6 +4,7 @@ from tqdm import tqdm
 import json
 import xml.etree.ElementTree as ET
 import h5py
+import tables as tb
 from h5py import Dataset
 import numpy as np
 
@@ -78,8 +79,11 @@ class EventlistSnapshot():
                     # Import the selected attributes by the xml model to the current CArray  
                     for j, model_attr in enumerate(model_carrayattrs):
                         model_attrname = model_attr.get('name')
-                        attr_value = attrsdl1[idx_dl1][model_attrname]
-                        newarray[idx_dl1, j] = attr_value
+                        if model_attrname in attrsdl1[idx_dl1]:
+                            attr_value = attrsdl1[idx_dl1][model_attrname]
+                            newarray[idx_dl1, j] = attr_value
+                        else:
+                            newarray[idx_dl1, j] = 1
                 # Determine the numpy dtype
                 if model_CArray_dtype == 'int16':
                     np_dtype = np.int16
@@ -105,7 +109,7 @@ class EventlistSnapshot():
         print("Processing " + filename)
         self.create_directory(outdir)
         basename = Path(outdir, os.path.basename(filename))
-        outputfilename = f"{Path(basename).with_suffix('.dl2.h5')}"
+        outputfilename = f"{Path(basename).with_suffix('.dl1.h5')}"
         # Check if file exists and is not empty
         self.delete_empty_file(outputfilename)
         if os.path.exists(outputfilename):
@@ -127,7 +131,7 @@ class EventlistSnapshot():
                                    wfdl0name, 
                                    i)
         self.__dl1Write(dl1_path)
-
+        
 
     def delete_empty_file(self, nome_file):
         # Verifica se il file esiste e ha lunghezza zero
@@ -142,7 +146,7 @@ class EventlistSnapshot():
             else:
                 print(f"Il file '{nome_file}' non empty.")
         else:
-            print(f"Il file '{nome_file}' non esiste.")
+            print(f"Il file '{nome_file}' non esiste. continuo...")
             
 
     def create_directory(self, directory_path):
