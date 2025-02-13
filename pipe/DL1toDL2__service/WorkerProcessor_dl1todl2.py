@@ -6,47 +6,43 @@ from printcolors import *
 import traceback
 
 class WorkerDL1toDL2(WorkerBase):
-	def config(self, configuration):
-		# Get pid target
-		pidtarget = configuration['header']['pidtarget']
-		# Check if current supervisor is in the pidtarget
-		if pidtarget == self.supervisor.name or pidtarget == "all".lower() or pidtarget == "*":
-			# Get configuration
-			self.config_detector = configuration['config']['config']
-			# Check if it exists the configuration json file
-			if os.path.exists(self.config_detector):
-				print(f"Received config: {configuration}")
-				# Init processing object
-				self.eventlist_dl1 = Eventlist(
-					from_dl1=True,
-					config_detector=self.config_detector, 						# Config file
-					xml_model_path='/home/gamma/workspace/dams/dl1/DL1model.xml'
-				)
-				self.logger.debug(f"DL1toDL2 configured with - {self.config_detector}!")
-			else:
-				self.logger.warning(f"This configuration file {self.config_detector} for Eventlist doesn't exist!\nPlease provide a valid file!" )
-				raise Exception(f"This configuration file {self.config_detector} for Eventlist doesn't exist!\nPlease provide a valid file!")
-		else: 
-			return
-	
 	def __init__(self):
 		super().__init__()
+		self.config_detector = os.getenv("CONFIG_DETECTOR", "/home/gamma/workspace/dams/dl1/detectorconfig_PMT.json")
+		self.dl1_xmlmodel    = os.getenv("DL1_MODEL", "/home/gamma/workspace/dams/dl1/DL1model.xml")
 		# Create for eventlist
-		self.eventlist_dl1 = None
+		self.eventlist_dl1 = Eventlist(
+			from_dl1=True,
+			config_detector=self.config_detector, 								# Config file
+			xml_model_path=self.dl1_xmlmodel
+		)
+
+
+	def config(self, conf_message):
+		self.config_detector = super().config(conf_message)
+		# Check if it exists the configuration json file
+		if os.path.exists(self.config_detector):
+			# Init processing object
+			self.eventlist_dl1 = Eventlist(
+				from_dl1=True,
+				config_detector=self.config_detector, 							# Config file
+				xml_model_path='/home/gamma/workspace/dams/dl1/DL1model.xml'
+			)
+			self.logger.debug(f"DL1toDL2 configured with - {self.config_detector}!")
+		else:
+			self.logger.warning(f"This configuration file {self.config_detector} for Eventlist doesn't exist!\nPlease provide a valid file!" )
+	
 
 	def process_data(self, data, priority):
 		if self.eventlist_dl1 is None:
 			self.logger.warning("DL1toDL2 Eventlist not still configured! Please send configuration file!")
-			raise Exception("DL1toDL2 Eventlist not still configured! Please send configuration file!")
 		
 		if self.supervisor.dataflowtype == "binary" or self.supervisor.dataflowtype == "filename":
 			self.logger.critical(f"A string dataflowtype is expected instead of \'{self.supervisor.dataflowtype}\'", extra=self.workersname)
-			raise Exception("A string dataflowtype is expected")
 			
 		if self.supervisor.dataflowtype == "string":
 			self.logger.debug(f"\'{data}\'", extra=self.workersname)
 			try:
-				print(data)
 				data = json.loads(data)
 				source = data["source"]
 				dest = data["dest"]
