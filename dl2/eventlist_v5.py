@@ -445,7 +445,10 @@ class EventlistDL0(EventlistGeneral):
                             "temp": temp
                         })
                     else:
-                        current_tstart = float(((peaks[j] - peaks[0]) * data.attrs['Dec'] * 8e-9) + tstart)
+                        if 'Dec' in data.attrs:
+                            current_tstart = float(((peaks[j] - peaks[0]) * data.attrs['Dec'] * 8e-9) + tstart)
+                        else:
+                            current_tstart = float(((peaks[j] - peaks[0]) * 1. * 8e-9) + tstart)
                         res_dict.append({
                             "original_wf": i,
                             "pk_idx": j+1,
@@ -717,7 +720,7 @@ class EventlistDL1(EventlistGeneral):
                         xr = range(self.deltav, len(arrExp)+self.deltav)
                         xr2 = range(len(arrExp))
                         # N(t) = N_0 * 2^{-t/T}
-                        valueE = arrExp[self.deltav] * np.power(2, xr2 * (-1/(rowsHalf[0]-5)))
+                        valueE = arrExp[self.deltav] * np.power(2, xr2 * (-1/(rowsHalf[0])))
                         integralExp = np.sum(valueE) + np.sum(arrSub[:self.deltav])
 
                         # Subtract the exponential decay for pileup

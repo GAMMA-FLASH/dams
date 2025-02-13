@@ -79,8 +79,11 @@ class EventlistSnapshot():
                     # Import the selected attributes by the xml model to the current CArray  
                     for j, model_attr in enumerate(model_carrayattrs):
                         model_attrname = model_attr.get('name')
-                        attr_value = attrsdl1[idx_dl1][model_attrname]
-                        newarray[idx_dl1, j] = attr_value
+                        if model_attrname in attrsdl1[idx_dl1]:
+                            attr_value = attrsdl1[idx_dl1][model_attrname]
+                            newarray[idx_dl1, j] = attr_value
+                        else:
+                            newarray[idx_dl1, j] = 1
                 # Determine the numpy dtype
                 if model_CArray_dtype == 'int16':
                     np_dtype = np.int16
