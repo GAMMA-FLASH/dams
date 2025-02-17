@@ -472,7 +472,7 @@ class Save(BaseWorker):
                 arr._v_attrs.SampleNo = wf.sample_no
                 arr._v_attrs.tstart = wf.tstart
                 arr._v_attrs.tend = wf.tstop
-                arr[:16384] = np.transpose(np.array([wf.sigr.astype(np.int16)]))[:16384]
+                arr[:16384] = np.transpose(np.array([wf.sigr.astype(np.int16)*-1]))[:16384]
 
             if self.save_hk:
 
@@ -647,11 +647,12 @@ if __name__ == '__main__':
     print("INFO: Main: Start data acquistion")
 
     start_acquisition(sock, crc_table)
-
+    from datetime import datetime
     # ----------------------------------
     # Monitor loop
     # ----------------------------------
     while not stopped.is_set():
+        print(f"INFO: MAIN - {datetime.now()}. queue monitoring. size: {queue.qsize()}")
         sleep(5)
 
     # ----------------------------------
