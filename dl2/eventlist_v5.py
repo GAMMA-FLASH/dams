@@ -285,12 +285,12 @@ class EventlistDL0(EventlistGeneral):
             # Filter peaks based on predefined conditions
             peaks2 = np.copy(peaks)
             for v in peaks2:
-                arrcalcMM = arrmov[v] - arrmov[v-self.deltav:v+self.deltav].copy()
+                arrcalcMM = arrmov[v] - arrmov[v-self.deltav: v+self.deltav].copy()
 
                 # 80 has been chosen with heuristics on data 
                 ind = np.where(arrcalcMM[:] > self.thr_heur)
                 # Remove peaks too small or peaks too close to the end of the wf
-                if len(ind[0]) == 0 or v > self.thr_end_wf:
+                if len(ind[0]) == 0 or v > self.thr_end_wf or v < self.thr_start_wf:
                     if log == True:
                         # Optionally log detailed information and plots
                         print("delete peak")
@@ -298,8 +298,7 @@ class EventlistDL0(EventlistGeneral):
                         plt.figure()
                         plt.plot(range(len(arr)),arr, color='g')
                         plt.plot(range(len(arrmov)),arrmov)
-                        for v in peaks:
-                            plt.axvline(x = v, color = 'r') 
+                        plt.vlines(peaks, 0, max(arr), colors='r')
                         plt.show()
                     peaks = peaks[peaks != v]
             
@@ -464,19 +463,18 @@ class EventlistDL0(EventlistGeneral):
                     j = j + 1
                     arrSignal_tt_list.append(arrSignal_tt.copy())
             
-                integrals_1 = np.array([dc['integral1'] for dc in res_dict] + [0])
-                integrals_2 = np.array([dc['integral2'] for dc in res_dict] + [0])
+                integrals_1 = np.array([dc['integral1'] for dc in res_dict])
+                integrals_2 = np.array([dc['integral2'] for dc in res_dict])
                 arrSignal_tt_list.append(np.array([]))
 
-                for i_rd, _ in enumerate(res_dict):
-                    # If it is a pileup case
-                    if np.isin(arrSignal_tt_list[i_rd+1], 
-                               arrSignal_tt_list[i_rd]).all():
-                        integral1_i_rd = integrals_1[i_rd] - np.sum(integrals_1[i_rd+1:])
-                        integral2_i_rd = integrals_2[i_rd] - np.sum(integrals_2[i_rd+1:])
-                    else:
-                        integral1_i_rd = integrals_1[i_rd]
-                        integral2_i_rd = integrals_2[i_rd]
+                for i_rd in range(len(res_dict)):
+                    integral1_i_rd = integrals_1[i_rd]
+                    integral2_i_rd = integrals_2[i_rd]
+                    for j_rd in range(i_rd+1, len(res_dict)):
+                        # If it is a pileup case
+                        if np.isin(arrSignal_tt_list[j_rd], arrSignal_tt_list[i_rd]).all():
+                            integral1_i_rd -= integrals_1[j_rd]
+                            integral2_i_rd -= integrals_2[j_rd]
                     
                     # N_Waveform	mult	tstart	index_peak	peak	integral1	integral2	integral3	halflife	temp
                     f.write(f"{res_dict[i_rd]['original_wf']}"
@@ -578,7 +576,7 @@ class EventlistDL1(EventlistGeneral):
         dl2_data = []   # List to store processed data for saving to output
 
         # readapt endEvent
-        endEvent = endEvent if endEvent >= 0 else len(wfs)
+        endEvent = endEvent if endEvent >= 0 else self.dl1attrs.get_attr(h5file, len(wfs)-1, 'original_wf')
 
         # Iterate over waveforms in the HDF5 group
         for i in tqdm(range(len(wfs)), disable=not pbar_show):
@@ -599,18 +597,19 @@ class EventlistDL1(EventlistGeneral):
             # Get tstart
             tstart          = self.dl1attrs.get_attr(h5file, i, 'tstart')
             mmean1          = self.dl1attrs.get_attr(h5file, i, 'mmean1')
+            mmean2          = mmean1 * 2 * 0.9
             stdev1          = self.dl1attrs.get_attr(h5file, i, 'stdev1')
             # Get maximum value of wf
             val = np.max(data)
 
             # Create a copy of the waveform array for processing
-            y = data + self.arr_bias
+            y = data
             if val > self.saturationValue:
                 for t, val in enumerate(data):
                     y[t] = Eventlist.twos_comp_to_int(val)
             
             # Deep copy of y array 
-            arr = y.copy()
+            arr = y.copy() + self.arr_bias
             # Compute moving average
             arrmov = self.moving_average(arr, self.mavg_wsize)
 
@@ -618,21 +617,25 @@ class EventlistDL1(EventlistGeneral):
                 # If in DL1 we didn't find any peak the list should be empty
                 peaks = np.array([])
             elif isdoubleEvent:
+                peak_pos = self.dl1attrs.get_attr(h5file, i, 'peak_pos')
+                peak_pos -= wf_start 
                 # If it is a double event
-                peaks, _ = find_peaks(arrmov, height=mmean1*2* 0.9, width=self.findpk_width, distance=self.findpk_distance)
+                peaks, _ = find_peaks(arrmov, height=mmean2, width=self.findpk_width, distance=self.findpk_distance)
             else:
                 # If it is a single event event 
                 peaks  = np.array([self.dl1attrs.get_attr(h5file, i, 'peak_pos') - wf_start])
             
             # Extract peaks based on moving average and thresholds
             peaks2 = np.copy(peaks)
-            for v in peaks2:
+            for j, v in enumerate(peaks2):
                 arrcalcMM = arrmov[v] - arrmov[v-self.deltav:v+self.deltav].copy()
 
                 # 80 has been chosen with heuristics on data 
                 ind = np.where(arrcalcMM[:] > self.thr_heur)
+
+                v_dl0 = self.__getPeaks(peaks2, wf_start)[j]
                 # Remove peaks too small or peaks too close to the end of the wf
-                if len(ind[0]) == 0 or v > self.thr_end_wf:
+                if len(ind[0]) == 0 or v_dl0 > self.thr_end_wf or v_dl0 < self.thr_start_wf:
                     if log == True:
                         # Optionally log detailed information and plots
                         print("delete peak")
@@ -640,8 +643,7 @@ class EventlistDL1(EventlistGeneral):
                         plt.figure()
                         plt.plot(range(len(arr)),arr, color='g')
                         plt.plot(range(len(arrmov)),arrmov)
-                        for v in peaks:
-                            plt.axvline(x = v, color = 'r') 
+                        plt.vlines(peaks, 0, max(arr), colors='r')
                         plt.show()
                     peaks = peaks[peaks != v]
             
@@ -801,15 +803,14 @@ class EventlistDL1(EventlistGeneral):
                 integrals_2 = np.array([dc['integral2'] for dc in res_dict])
                 arrSignal_tt_list.append(np.array([]))
 
-                for i_rd, _ in enumerate(res_dict):
-                    # If it is a pileup case
-                    if np.isin(arrSignal_tt_list[i_rd+1], 
-                            arrSignal_tt_list[i_rd]).all():
-                        integral1_i_rd = integrals_1[i_rd] - np.sum(integrals_1[i_rd+1:])
-                        integral2_i_rd = integrals_2[i_rd] - np.sum(integrals_2[i_rd+1:])
-                    else:
-                        integral1_i_rd = integrals_1[i_rd]
-                        integral2_i_rd = integrals_2[i_rd]
+                for i_rd in range(len(res_dict)):
+                    integral1_i_rd = integrals_1[i_rd]
+                    integral2_i_rd = integrals_2[i_rd]
+                    for j_rd in range(i_rd+1, len(res_dict)):
+                        # If it is a pileup case
+                        if np.isin(arrSignal_tt_list[j_rd], arrSignal_tt_list[i_rd]).all():
+                            integral1_i_rd -= integrals_1[j_rd]
+                            integral2_i_rd -= integrals_2[j_rd]
                         
                     # N_Waveform	mult	tstart	index_peak	peak	integral1	integral2	integral3	halflife	temp
                     f.write(f"{res_dict[i_rd]['original_wf']}"

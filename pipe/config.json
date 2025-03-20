@@ -26,7 +26,7 @@
             "result_dataflow_type": "string",
             "result_lp_socket": "tcp://127.0.0.1:5535",
             "result_hp_socket": "tcp://127.0.0.1:5536",
-            "num_workers": 1,
+            "num_workers": 10,
             "name": "dl0todl2",
             "name_workers": "worker"
         }
@@ -51,7 +51,7 @@
             "result_dataflow_type": "string",
             "result_lp_socket": "tcp://127.0.0.1:5525",
             "result_hp_socket": "tcp://127.0.0.1:5526",
-            "num_workers": 1,
+            "num_workers": 10,
             "name": "dl0todl1",
             "name_workers": "worker"
         }
@@ -76,7 +76,7 @@
             "result_dataflow_type": "string",
             "result_lp_socket": "tcp://127.0.0.1:5535",
             "result_hp_socket": "tcp://127.0.0.1:5536",
-            "num_workers": 1,
+            "num_workers": 10,
             "name": "dl1todl2",
             "name_workers": "worker"
         }
@@ -101,7 +101,7 @@
             "result_dataflow_type": "none",
             "result_lp_socket": "none",
             "result_hp_socket": "none",
-            "num_workers": 1,
+            "num_workers": 2,
             "name": "dl2chkr",
             "name_workers": "worker"
         }

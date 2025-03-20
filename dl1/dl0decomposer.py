@@ -57,35 +57,47 @@ class DL0Decomposer():
             #  
             ind = np.where(arrcalcMM[:] > self.thr_heur)
             # Remove peaks too small or peaks too close to the end of the wf
-            if len(ind[0]) == 0 or v > self.thr_end_wf:
-            # If  v > 16000:
+            if len(ind[0]) == 0 or v > self.thr_end_wf or v < self.thr_start_wf:
                 peaks = peaks[peaks != v]
         return peaks
     
-    def __is_doubleevent(self, peaks): # OK
+    def __is_doubleevent(self, peaks, peaks_idx):
         """
-        This function filter from list of peaks only the firtst of double events and return a flag 
-        `F_double` which will be 1 if there are multiple peaks for the same event and 0 otherwise.
-        ### Args
-        * `peaks`: list of peaks detected
+        Filtra eventi multipli sovrapposti (pile-up) in una lista di picchi.
+        Restituisce la lista filtrata, gli indici e un flag che indica la presenza di eventi multipli.
+        
+        Un picco viene mantenuto solo se esiste almeno un successivo il cui indice 
+        è a distanza minore di `self.delta_dx` dal primo.
+        
+        Args:
+            peaks (np.array): Lista di picchi rilevati.
+            peaks_idx (np.array): Indici originali dei picchi.
+
+        Returns:
+            peaks (np.array): Lista filtrata di picchi.
+            peaks_idx (np.array): Indici originali dei picchi mantenuti.
+            F_double (int): Flag (1 se c'erano eventi multipli, 0 altrimenti).
         """
-        # Flag for multiple peaks for the same event
+        if len(peaks) < 2:
+            return peaks, peaks_idx, 0  # Se c'è un solo picco, non c'è pile-up
+
         F_double = 0
-        peaks_idx = np.array(range(len(peaks)))
-        # Check of multiple events 
-        if len(peaks) > 1:
-            peaks2    = np.copy(peaks)
-            for v, v1 in zip(peaks2, peaks2[1:]):
-                meanblock = self.meanblocks[v:]
-                rowsL = np.where(np.logical_and(meanblock > self.mmean1 - 1,
-                                                meanblock < self.mmean1 + 1))[0]
-                if len(rowsL) > 0:
-                    firts_bkgblock_idx = v + rowsL[0]
-                    if firts_bkgblock_idx > v1:
-                        not_v1 = peaks != v1
-                        peaks_idx = peaks_idx[not_v1]
-                        peaks = peaks[not_v1]
-                        F_double = 1
+        # Lista per i picchi che soddisfano la condizione
+        keep_mask = np.zeros(len(peaks), dtype=bool)
+
+        v = peaks[0]
+        for i in range(1, len(peaks)):
+            endindex = self.__get_endindex(v)
+            # Controlla se esiste almeno un picco successivo entro `self.delta_dx`
+            if peaks[i] < endindex:
+                keep_mask[i] = True
+
+        if np.any(keep_mask):
+            F_double = 1  # Almeno un evento multiplo rilevato
+
+        peaks     = peaks[~keep_mask]
+        peaks_idx = peaks_idx[~keep_mask]
+
         return peaks, peaks_idx, F_double
 
     # def __reset_time(self, start_index, end_index, n_event=0):
@@ -121,15 +133,38 @@ class DL0Decomposer():
         dl0_attrs = self.wfdl0.attrs
         return dict(dl0_attrs)
     
-    def __get_endindex(self, v): # OK
-        meanblock = self.meanblocks[v:]
-        rowsL = np.where(np.logical_and(meanblock > self.mmean1 - 1,
-                                        meanblock < self.mmean1 + 1))[0]
-        if len(rowsL) > 0:
-            end_index = v + rowsL[0] + 2*self.blocksSize_endindex
+    def __get_startindex(self, v):  # min_steps definisce quanti valori consecutivi devono stare nel range
+        meanblock = np.copy(self.meanblocks[:v])[::-1]
+        if len(meanblock) < self.deltac_sx:
+            # Se non è possibile creare almeno una window
+            return 0
+        meandiffs = np.abs(meanblock - self.mmean1)
+        condition = meandiffs < self.stdev1
+        condition_ws = np.lib.stride_tricks.sliding_window_view(condition, self.deltac_sx)
+        valid_indeces = np.where(condition_ws.all(axis=1))[0]
+        if len(valid_indeces) > 0:
+            end_index = v - (valid_indeces[0] + self.deltac_sx)
+            return end_index
         else:
-            end_index = len(self.wfdl0)
-        return end_index
+            # Se nessuna sequenza valida è trovata, ritorna la lunghezza massima
+            return 0
+
+    def __get_endindex(self, v):  # min_steps definisce quanti valori consecutivi devono stare nel range
+        meanblock = self.meanblocks[v:]
+        if len(meanblock) < self.deltac_dx:
+            # Se non è possibile creare almeno una window
+            return len(self.wfdl0)
+        meandiffs = np.abs(meanblock - self.mmean1)
+        condition = meandiffs < self.stdev1
+        condition_true = np.where(condition)
+        condition_ws = np.lib.stride_tricks.sliding_window_view(condition, self.deltac_dx)
+        valid_indeces = np.where(condition_ws.all(axis=1))[0]
+        if len(valid_indeces) > 0:
+            end_index = v + valid_indeces[0] + self.deltac_dx
+            return end_index
+        else:
+            # Se nessuna sequenza valida è trovata, ritorna la lunghezza massima
+            return len(self.wfdl0)
     
     def __dl02dl1(self):
         """
@@ -140,8 +175,9 @@ class DL0Decomposer():
         peaks = self.__get_peak_lists()
         # Get total number of peaks considering also double events
         n_peaks = len(peaks)
+        peaks_idx = np.arange(len(peaks))
         # Filter from double events and the flag for multiple events
-        peaks, peaks_idx, isdouble = self.__is_doubleevent(peaks)
+        peaks, peaks_idx, isdouble = self.__is_doubleevent(peaks, peaks_idx)
         if len(peaks) == 0:
             # Copy the old data and append the data
             array_new = self.wfdl0[:, -1]
@@ -166,11 +202,16 @@ class DL0Decomposer():
             self.attrsdl1List.append(dl1attrs)
         else:
             # Iterate over each peaks list for each wf_i
-            for pk_idx, pk in zip(peaks_idx, peaks):
+            # for pk_idx, pk in zip(peaks_idx, peaks):
+            pk, peaks1 = peaks[0], np.copy(peaks[1:])
+            _pki, _peaks1_idx = peaks_idx[0], np.copy(peaks_idx[1:])
+            while pk != -1:
                 # Calculate the indices to maintain
-                start_index = max(pk - self.deltac_sx, 0)
+                # start_index = max(pk - self.deltac_sx, 0)
+                start_index = self.__get_startindex(pk)
                 # Calculate the endindex
                 end_index = self.__get_endindex(pk)
+
                 # Extract the sanapshot
                 snapshot_arr = self.wfdl0[start_index:end_index, -1]
                 wf_size = end_index-start_index
@@ -178,7 +219,7 @@ class DL0Decomposer():
                 array_new = np.zeros(self.xlen)[:len(snapshot_arr)] + snapshot_arr
                 # Date and time reset attrs
                 # tstart1, tend1 = self.__reset_time(start_index, end_index, n_event=pk_idx)
-                tstart1, tend1 = self.__reset_time(peaks[0], pk, end_index, wf_size, pk_idx)
+                tstart1, tend1 = self.__reset_time(peaks[0], pk, end_index, wf_size, _pki)
                 # Copy the old attributes and add new attributes
                 dl1attrs = self.__attrstodict() | {
                     'wf_size'     : wf_size,
@@ -187,7 +228,7 @@ class DL0Decomposer():
                     'pk0_pos'     : peaks[0],
                     'pk0_tstart'  : self.wfdl0.attrs['tstart'],
                     'peak_pos'    : pk,
-                    'peak_idx'    : pk_idx,
+                    'peak_idx'    : _pki,
                     'mmean1'      : self.mmean1,
                     'stdev1'      : self.stdev1,
                     'isdouble'    : isdouble,
@@ -198,6 +239,13 @@ class DL0Decomposer():
                 # Save new data and attributes
                 self.wvfrsdl1List.append(array_new)
                 self.attrsdl1List.append(dl1attrs)
+                # update step
+                if len(peaks1) >= 1:
+                    peaks1, _peaks1_idx, isdouble = self.__is_doubleevent(peaks1, _peaks1_idx)
+                    pk, peaks1        = peaks1[0], peaks1[1:]
+                    _pki, _peaks1_idx = _peaks1_idx[0], _peaks1_idx[1:]
+                else:
+                    pk = -1
 
     def toDL1component(self):
         self.__dl02dl1()

@@ -7,13 +7,14 @@
     "findpk_width":15, 
     "blocks_size": 25,
     "thr_heur": 80,
+    "thr_start_wf": 130,
     "thr_end_wf": 16000,
     
     "arr_bias": 0,
     "deltav": 20,
     
-    "deltac_sx": 150,
-    "deltac_dx": 1000,
+    "deltac_sx": 250,
+    "deltac_dx": 350,
     
     "blocksSize_dblEvent": 30,
     "blocksSize_endindex": 100,

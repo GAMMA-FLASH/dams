@@ -187,13 +187,14 @@ def run_silent_test(args):
         (["python", "test_GammaFlash.py", "-N", "3"], None),
         (["python", "test_GammaFlash.py", "-N", "4"], None),
         # Sleep di 5 secondi
-        (["python", "/home/gamma/workspace/dams/setup/wait_for_rtadp.py", args.config_json_path, "15", "--extended"], "wait_pipe_start.log"),
+        # (["python", "/home/gamma/workspace/dams/setup/wait_for_rtadp.py", args.config_json_path, "20", "--extended"], "wait_pipe_start.log"),
+        ("sleep 20", None),
         (["python", "test_GammaFlash.py", "-N", "30", "-o", "/home/gamma/workspace/Out/json", "-d", "/home/gamma/workspace/dams/dl1/detectorconfig_PMT.json", "-t", "all"], "send_config.log"),
         # Sleep di 5 secondo
-        ("sleep 5", None),
+        ("sleep 10", None),
         (["python", "test_GammaFlash.py", "-N", "20", "-c", "start", "-t", "all"], "start_command.log"),
         # Sleep di 5 secondo
-        ("sleep 5", None),
+        ("sleep 10", None),
         (["python", "test_GammaFlash.py", "-N", "0", "-acq", args.acquisition], "producer.log"),
     ]
 
