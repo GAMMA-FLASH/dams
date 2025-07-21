@@ -4,7 +4,11 @@ TIMESTAMP=$(date '+%Y-%m-%d_%H-%M')
 
 export ODIR=$HOME/workspace/Data/$TIMESTAMP
 
-./bootstrap2.sh
+### Bootstrap
+
+pushd ./
+cd ../gfpl && ./bootstrap2.sh
+popd
 
 echo $TIMESTAMP
 echo $ODIR
@@ -62,3 +66,4 @@ else
     echo "error! use 'all' cli arg"
 
 fi
+
