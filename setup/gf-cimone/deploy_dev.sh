@@ -1,9 +1,12 @@
 #!/bin/bash
 
-# docker pull git.ia2.inaf.it:5050/gammasky/gammasky-cimone/dams_base:1.6.0
+#---------------------ONETIME ----------------------------------
 
-#/home/laboratorio/workspace/dams/env/bootstrap.sh gammaflash:1.5.0 $USER
+# docker login git.ia2.inaf.it:5050
+# docker pull git.ia2.inaf.it:5050/gammasky/gammasky-cimone/dams_base:1.5.1
 
+#/home/laboratorio/workspace/dams/env/bootstrap.sh git.ia2.inaf.it:5050/gammasky/gammasky-cimone/dams_base:1.5.1 $USER
+#---------------------------------------------------------------
 # Ottieni la directory dello script
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
