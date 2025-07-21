@@ -1,4 +1,5 @@
 import os
+import signal
 import sys
 import subprocess
 import argparse
@@ -44,11 +45,22 @@ INFLUX_DB_TOKEN = None
 INFLUX_DB_ORG = None
 INFLUX_DB_BUCKET = None
 INFLUX_DB_BUCKET_HK = None
+main_running = True
 class TimestampOptions(Enum):
     RedPitaya = 'RP'  # Use tstart from the waveform
     MainComputer = 'MC'  # Sample the time from the main computer
 INFLUX_WF_TIMESTAMP : TimestampOptions = TimestampOptions.MainComputer
 INFLUX_HK_TIMESTAMP : TimestampOptions = TimestampOptions.MainComputer
+
+# ------------------------------------------------------------------ #
+# Signal Handler                                                     #
+# ------------------------------------------------------------------ #
+def handle_sigint(signum, frame):
+    print("Ricevuto SIGINT. Uscita...")
+    global main_running
+    main_running = False
+
+signal.signal(signal.SIGINT, handle_sigint)
 
 def trx_to_str(trx):
     ts = time.gmtime(trx)
@@ -702,12 +714,8 @@ if __name__ == '__main__':
     # ----------------------------------
     # Monitor loop
     # ----------------------------------
-    while True:
-        try:
-            #print("INFO: Main: Running ")
-            sleep(5)
-        except KeyboardInterrupt:
-            break
+    while main_running:
+        sleep(5)
 
     # ----------------------------------
     # Ordered shutdown

@@ -16,11 +16,11 @@ EOF
 
 if [ $# -eq 0 ]; then
     for i in {101..106}; do
-        bootstrap $i
+        bootstrap gf$i
     done
 else
     if [[ $1 =~ ^10[1-6]$ ]]; then
-        bootstrap $1
+        bootstrap gf$1
     else
         echo "Invalid argument. Please provide a number between 101 and 106."
         exit 1
